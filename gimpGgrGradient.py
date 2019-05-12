@@ -35,12 +35,12 @@ class GradientSegment(object):
 		"""
 		raise NotImplementedError()
 	
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
 		data=data.split(' ')
 		if len(data)<11 or len(data)>15:
@@ -58,6 +58,28 @@ class GradientSegment(object):
 					self.leftColorType=int(data[13])
 					if len(data)>=15:
 						self.rightColorType=int(data[14])
+						
+	def toBytes(self):
+		"""
+		encode this to a byte array
+		"""
+		ret=[]
+		ret.append(self.leftPosition)
+		ret.append(self.middlePosition)
+		ret.append(self.rightPosition)
+		for chan in self.leftColor:
+			ret.append(chan)
+		for chan in self.rightColor:
+			ret.append(chan)
+		if self.blendFunc is not None:
+			ret.append(self.blendFunc)
+			if self.colorType is not None:
+				ret.append(self.colorType)
+				if self.leftColorType is not None:
+					ret.append(self.leftColorType)
+					if self.rightColorType is not None:
+						ret.append(self.rightColorType)
+		return ' '.join(ret)
 
 	def __repr__(self,indent=''):
 		"""
@@ -74,6 +96,7 @@ class GradientSegment(object):
 		ret.append('Left Color Type: '+self.ENDPOINT_COLOR_TYPES[self.leftColorType])
 		ret.append('Right Color Type: '+self.ENDPOINT_COLOR_TYPES[self.rightColorType])
 		return ('\n'+indent).join(ret)
+
 
 class GimpGgrGradient(object):
 	"""
@@ -106,12 +129,12 @@ class GimpGgrGradient(object):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
 		data=data.split('\n')
 		data=[l.strip() for l in data]
@@ -123,12 +146,25 @@ class GimpGgrGradient(object):
 			gs=GradientSegment()
 			gs._decode_(data[i+3])
 			self.segments.append(gs)
+			
+	def toBytes(self):
+		"""
+		encode this to a byte array
+		"""
+		ret=['GIMP Gradient']
+		ret.append('Name: '+self.name)
+		ret.append(str(len(self.segments)))
+		for segment in self.segments:
+			ret.append(segment.toBytes())
+		return '\n'.join(ret)
 
 	def save(self,toFilename=None,toExtension=None):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
 		
 	def getColor(self,percent):
 		"""

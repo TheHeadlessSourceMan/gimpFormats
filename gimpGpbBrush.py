@@ -10,7 +10,7 @@ from gimpGbrBrush import *
 from gimpPatPattern import *
 	
 
-class GimpGpbBrush(BinIOBase):
+class GimpGpbBrush(object):
 	"""
 	Pure python implementation of the OLD gimp gpb brush format
 
@@ -19,7 +19,6 @@ class GimpGpbBrush(BinIOBase):
 	"""
 
 	def __init__(self,filename):
-		BinIOBase.__init__(self)
 		self.brush=GimpGbrBrush()
 		self.pattern=GimpPatPattern()
 
@@ -39,23 +38,33 @@ class GimpGpbBrush(BinIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		self._idx=self.brush._decode_(data,self._idx)
-		self._idx=self.pattern._decode_(data,self._idx)
-		return self._idx
+		index=self.brush._decode_(data,index)
+		index=self.pattern._decode_(data,index)
+		return index
+		
+	def toBytes(self):
+		"""
+		encode this object to a byte array
+		"""
+		io=IO()
+		io.addBytes(self.brush.toBytes())
+		io.addBytes(self.pattern.toBytes())
+		return io.data
 
 	def save(self,toFilename=None,toExtension=None):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""

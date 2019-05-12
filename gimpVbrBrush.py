@@ -5,7 +5,6 @@ Pure python implementation of the gimp vbr brush format
 """
 import struct
 import PIL.Image
-from binaryIO import *
 	
 
 class GimpVbrBrush(object):
@@ -47,12 +46,12 @@ class GimpVbrBrush(object):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
 		data=[s.strip() for s in data.split('\n')]
 		if data[0]!="GIMP-VBR":

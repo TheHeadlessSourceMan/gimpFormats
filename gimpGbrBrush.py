@@ -8,7 +8,7 @@ import PIL.Image
 from binaryIO import *
 	
 
-class GimpGbrBrush(BinIOBase):
+class GimpGbrBrush(object):
 	"""
 	Pure python implementation of the gimp gbr brush format
 
@@ -19,7 +19,6 @@ class GimpGbrBrush(BinIOBase):
 	COLOR_MODES=[None,'L','LA','RGB','RGBA'] # only L or RGB allowed
 
 	def __init__(self,filename=None):
-		BinIOBase.__init__(self)
 		self.filename=None
 		self.version=2
 		self.width=0
@@ -48,30 +47,46 @@ class GimpGbrBrush(BinIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		BinIOBase._decode_(self,data,idx)
-		headerSize=self._u32_()
-		self.version=self._u32_()
+		io=IO(data,index)
+		headerSize=io.u32
+		self.version=io.u32
 		if self.version!=2:
 			raise Exception('ERR: unknown brush version '+str(self.version))
-		self.width=self._u32_()
-		self.height=self._u32_()
-		self.bpp=self._u32_() # only allows grayscale or RGB
+		self.width=io.u32
+		self.height=io.u32
+		self.bpp=io.u32 # only allows grayscale or RGB
 		self.mode=self.COLOR_MODES[self.bpp]
-		magic=self._asciiz_(4)
+		magic=io.getBytes(4)
 		if magic!='GIMP':
 			raise Exception('File format error.  Magic value mismatch.')
-		self.spacing=self._u32_()
-		nameLen=headerSize-self._idx
-		self.name=self._asciiz_(nameLen).decode('UTF-8')
-		self.rawImage=self._asciiz_(self.width*self.height*self.bpp)
-		return self._idx
+		self.spacing=io.u32
+		nameLen=headerSize-io.index
+		self.name=io.getBytes(nameLen).decode('UTF-8')
+		self.rawImage=io.getBytes(self.width*self.height*self.bpp)
+		return io.index
+			
+	def toBytes(self):
+		"""
+		encode this object to byte array
+		"""
+		io=IO()
+		io.u32=28+len(self.name)
+		io.u32=self.version
+		io.u32=self.width
+		io.u32=self.height
+		io.u32=self.bpp
+		io.addBytes('GIMP')
+		io.u32=self.spacing
+		io.addBytes(self.name)
+		io.addBytes(self.rawImage)
+		return io.data
 
 	@property
 	def size(self):
@@ -90,7 +105,9 @@ class GimpGbrBrush(BinIOBase):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""

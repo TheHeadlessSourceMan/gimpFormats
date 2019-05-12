@@ -8,7 +8,7 @@ from binaryIO import *
 from gimpParasites import *
 
 
-class GimpIOBase(BinIOBase):
+class GimpIOBase(object):
 	"""
 	A specialized binary file base for Gimp files
 	"""
@@ -125,9 +125,9 @@ class GimpIOBase(BinIOBase):
 	PROP_BLEND_SPACE        = 37
 	PROP_FLOAT_COLOR        = 38
 	PROP_SAMPLE_POINTS      = 39
+	PROP_NUM_PROPS          = 40
 
 	def __init__(self,parent):
-		BinIOBase.__init__(self)
 		self.parent=parent
 		self.parasites=[]
 		self.guidelines=[]
@@ -182,6 +182,18 @@ class GimpIOBase(BinIOBase):
 		if self.doc.version>=11:
 			return 64
 		return 32
+	def _pointerDecode_(self,io):
+		if self._POINTER_SIZE_==64:
+			return io.u64
+		return io.u32
+	def _pointerEncode_(self,ptr,io=None):
+		if io is None:
+			io=IO()
+		if self._POINTER_SIZE_==64:
+			io.u64=ptr
+		else:
+			io.u32=ptr
+		return io.data
 
 	@property
 	def doc(self):
@@ -213,58 +225,35 @@ class GimpIOBase(BinIOBase):
 		"""
 		self.uniqueId=tattoo
 
-	def _pointer_(self,data=None):
-		"""
-		decode a "pointer" in the file
-
-		:param data: if specified, extract a pointer from this data
-			otherwhise extract from current data and increment index
-		"""
-		if data is None:
-			if self._POINTER_SIZE_==32:
-				d=struct.unpack('>I',self._data[self._idx:self._idx+4])[0]
-				self._idx+=4
-			else:
-				d=struct.unpack('>Q',self._data[self._idx:self._idx+8])[0]
-				self._idx+=8
-		else:
-			if self._POINTER_SIZE_==32:
-				d=struct.unpack('>I',data[self._idx:self._idx+4])[0]
-			else:
-				d=struct.unpack('>Q',data[self._idx:self._idx+8])[0]
-		if d>len(self.root._data):
-			raise IndexError('Pointer '+str(d)+' is larger than file size '+str(len(self.root._data)))
-		return d
-
 	def _parasitesDecode_(self,data):
 		"""
 		decode list of parasites
 		"""
-		idx=0
-		while idx<len(data):
+		index=0
+		while index<len(data):
 			p=GimpParasite()
-			idx=p._decode_(data,idx)
+			index=p.fromBytes(data,index)
 			self.parasites.append(p)
-		return idx
+		return index
 
 	def _guidelinesDecode_(self,data):
 		"""
 		decode guidelines
 		"""
-		idx=0
-		while idx<len(data):
-			position=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
-			isVertical=struct.unpack('>B',data[idx])[0]==2; idx+=1
+		index=0
+		while index<len(data):
+			position=struct.unpack('>I',data[index:index+4])[0]; index+=4
+			isVertical=struct.unpack('>B',data[index])[0]==2; index+=1
 			self.guidelines.append((isVertical,position))
 
 	def _itemPathDecode_(self,data):
 		"""
 		decode item path
 		"""
-		idx=0
+		index=0
 		path=[]
-		while idx<len(data):
-			p=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
+		while index<len(data):
+			p=struct.unpack('>I',data[index:index+4])[0]; index+=4
 			path.append(p)
 		self.itemPath=path
 
@@ -272,10 +261,10 @@ class GimpIOBase(BinIOBase):
 		"""
 		decode vectors
 		"""
-		idx=0
-		self.vectorsVersion=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
-		self.activeVectorIndex=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
-		numPaths=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
+		index=0
+		self.vectorsVersion=struct.unpack('>I',data[index:index+4])[0]; index+=4
+		self.activeVectorIndex=struct.unpack('>I',data[index:index+4])[0]; index+=4
+		numPaths=struct.unpack('>I',data[index:index+4])[0]; index+=4
 		for _ in range(numPaths):
 			gv=GimpVector(self)
 			gv._decode_(data)
@@ -309,12 +298,12 @@ class GimpIOBase(BinIOBase):
 		decode colormap/palette
 		"""
 		_=struct.unpack('>I',data[0:4])[0] # number of colors
-		idx=4
+		index=4
 		colors=[]
-		while idx<len(data):
-			r=struct.unpack('>B',data[idx])[0]; idx+=1
-			g=struct.unpack('>B',data[idx])[0]; idx+=1
-			b=struct.unpack('>B',data[idx])[0]; idx+=1
+		while index<len(data):
+			r=struct.unpack('>B',data[index])[0]; index+=1
+			g=struct.unpack('>B',data[index])[0]; index+=1
+			b=struct.unpack('>B',data[index])[0]; index+=1
 			colors.append((r,g,b))
 		self.colorMap=colors
 
@@ -330,11 +319,11 @@ class GimpIOBase(BinIOBase):
 		"""
 		decode a series of points
 		"""
-		idx=0
+		index=0
 		samplePoints=[]
-		while idx<len(data):
-			x=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
-			y=struct.unpack('>I',data[idx:idx+4])[0]; idx+=4
+		while index<len(data):
+			x=struct.unpack('>I',data[index:index+4])[0]; index+=4
+			y=struct.unpack('>I',data[index:index+4])[0]; index+=4
 			samplePoints.append((x,y))
 		self.samplePoints=samplePoints
 
@@ -342,9 +331,10 @@ class GimpIOBase(BinIOBase):
 		"""
 		decode a single property
 		"""
+		io=IO(data,boolSize=32)
 		#print 'DECODING PROPERTY',propertyType,len(data)
 		if propertyType==self.PROP_COLORMAP:
-			self._colormapDecode_(data)
+			self._colormapDecode_(io)
 		elif propertyType==self.PROP_ACTIVE_LAYER:
 			self.selected=True
 		elif propertyType==self.PROP_ACTIVE_CHANNEL:
@@ -352,52 +342,52 @@ class GimpIOBase(BinIOBase):
 		elif propertyType==self.PROP_SELECTION:
 			self.isSelection=True
 		elif propertyType==self.PROP_FLOATING_SELECTION:
-			self.selectionAttachedTo=struct.unpack('>I',data[0:4])[0]
+			self.selectionAttachedTo=io.u32
 		elif propertyType==self.PROP_OPACITY:
-			self.opacity=struct.unpack('>I',data[0:4])[0]
+			self.opacity=io.u32
 		elif propertyType==self.PROP_MODE:
-			self.blendMode=struct.unpack('>I',data[0:4])[0]
+			self.blendMode=io.u32
 		elif propertyType==self.PROP_VISIBLE:
 			self.visible=True
 		elif propertyType==self.PROP_LINKED:
-			self.isLinked=struct.unpack('>I',data[0:4])[0]==1
+			self.isLinked=io.bool
 		elif propertyType==self.PROP_LOCK_ALPHA:
-			self.lockAlpha=struct.unpack('>I',data[0:4])[0]==1
+			self.lockAlpha=io.bool
 		elif propertyType==self.PROP_APPLY_MASK:
-			self.applyMask=struct.unpack('>I',data[0:4])[0]==1
+			self.applyMask=io.bool
 		elif propertyType==self.PROP_EDIT_MASK:
-			self.editingMask=struct.unpack('>I',data[0:4])[0]==1
+			self.editingMask=io.bool
 		elif propertyType==self.PROP_SHOW_MASK:
-			self.showMask=struct.unpack('>I',data[0:4])[0]==1
+			self.showMask=io.bool
 		elif propertyType==self.PROP_SHOW_MASKED:
-			self.showMasked=struct.unpack('>I',data[0:4])[0]==1
+			self.showMasked=io.bool
 		elif propertyType==self.PROP_OFFSETS:
-			self.xOffset=struct.unpack('>i',data[0:4])[0]
-			self.yOffset=struct.unpack('>i',data[4:8])[0]
+			self.xOffset=io.i32
+			self.yOffset=io.i32
 		elif propertyType==self.PROP_COLOR:
-			r=struct.unpack('>B',data[0])[0]
-			g=struct.unpack('>B',data[1])[0]
-			b=struct.unpack('>B',data[2])[0]
+			r=io.byte
+			g=io.byte
+			b=io.byte
 			self.color=[r,g,b]
 		elif propertyType==self.PROP_COMPRESSION:
-			self.compression=struct.unpack('>B',data[0])[0]
+			self.compression=io.byte
 		elif propertyType==self.PROP_GUIDES:
 			self._guidelinesDecode_(self,data)
 		elif propertyType==self.PROP_RESOLUTION:
-			self.horizontalResolution=struct.unpack('>f',data[0:4])[0]
-			self.verticalResolution=struct.unpack('>f',data[4:8])[0]
+			self.horizontalResolution=io.float32
+			self.verticalResolution=io.float32
 		elif propertyType==self.PROP_TATTOO:
 			self.uniqueId=data.encode('hex')
 		elif propertyType==self.PROP_PARASITES:
 			self._parasitesDecode_(data)
 		elif propertyType==self.PROP_UNIT:
-			self.units=struct.unpack('>I',data[0:4])[0]
+			self.units=io.u32
 		elif propertyType==self.PROP_PATHS:
-			numPaths=struct.unpack('>I',data[0:4])[0]; idx=4
+			numPaths=io.u32
 			for _ in range(numPaths):
-				nRead,path=self._pathDecode_(data[idx:])
+				nRead,path=self._pathDecode_(data[index:])
 				self.paths.append(path)
-				idx+=nRead
+				index+=nRead
 		elif propertyType==self.PROP_USER_UNIT:
 			self._userUnitsDecode_(data)
 		elif propertyType==self.PROP_VECTORS:
@@ -407,50 +397,68 @@ class GimpIOBase(BinIOBase):
 		elif propertyType==self.PROP_OLD_SAMPLE_POINTS:
 			raise Exception("ERR: old sample points structure not supported")
 		elif propertyType==self.PROP_LOCK_CONTENT:
-			self.locked=struct.unpack('>I',data[0:4])[0]==1
+			self.locked=io.bool
 		elif propertyType==self.PROP_GROUP_ITEM:
 			self.isGroup=True
 		elif propertyType==self.PROP_ITEM_PATH:
 			self._itemPathDecode_(data)
 		elif propertyType==self.PROP_GROUP_ITEM_FLAGS:
-			self.groupItemFlags=struct.unpack('>I',data[0:4])[0]
+			self.groupItemFlags=io.u32
 		elif propertyType==self.PROP_LOCK_POSITION:
-			self.positionLocked=struct.unpack('>I',data[0:4])[0]==1
+			self.positionLocked=io.bool
 		elif propertyType==self.PROP_FLOAT_OPACITY:
-			self.opacity=struct.unpack('>f',data[0:4])[0]
+			self.opacity=io.float32
 		elif propertyType==self.PROP_COLOR_TAG:
-			self.colorTag=struct.unpack('>I',data[0:4])[0]
+			self.colorTag=io.u32
 		elif propertyType==self.PROP_COMPOSITE_MODE:
-			self.compositeMode=struct.unpack('>i',data[0:4])[0]
+			self.compositeMode=io.i32
 		elif propertyType==self.PROP_COMPOSITE_SPACE:
-			self.compositeSpace=struct.unpack('>i',data[0:4])[0]
+			self.compositeSpace=io.i32
 		elif propertyType==self.PROP_BLEND_SPACE:
-			self.blendSpace=struct.unpack('>I',data[0:4])[0]
+			self.blendSpace=io.u32
 		elif propertyType==self.PROP_FLOAT_COLOR:
-			r=struct.unpack('>f',data[0:4])[0]
-			g=struct.unpack('>f',data[4:8])[0]
-			b=struct.unpack('>f',data[8:12])[0]
+			r=io.float32
+			g=io.float32
+			b=io.float32
 			self.color=[r,g,b]
 		elif propertyType==self.PROP_SAMPLE_POINTS:
 			self._samplePointsDecode_(data)
 		else:
 			raise Exception('Unknown property id '+str(propertyType))
-		return self._idx
+		return io.index
+		
+	def _propertyEncode_(self,propertyType):
+		"""
+		encode a single property
+		
+		If the property is the same as the default, or not specified, returns empty array
+		"""
+		raise NotImplementedError()
 
-	def _propertiesDecode_(self):
+	def _propertiesDecode_(self,io):
 		"""
 		decode a list of properties
 		"""
 		while True:
 			try:
-				propertyType=self._u32_()
-				dataLength=self._u32_()
+				propertyType=io.u32
+				dataLength=io.u32
 			except struct.error: # end of data, so that's that.
 				break
 			if propertyType==0:
 				break
-			self._propertyDecode_(propertyType,self._bytes_(dataLength))
-		return self._idx
+			self._propertyDecode_(propertyType,io.getBytes(dataLength))
+		return io.index
+	def _propertiesEncode_(self):
+		"""
+		encode a list of properties
+		"""
+		io=IO()
+		for propertyType in self.PROP_NUM_PROPS:
+			moData=self._propertyEncode_(propertyType)
+			if moData:
+				io.addBytes(moData)
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""
@@ -543,13 +551,12 @@ class GimpIOBase(BinIOBase):
 		return indent+(('\n'+indent).join(ret))
 		
 		
-class GimpUserUnits(BinIOBase):
+class GimpUserUnits(object):
 	"""
 	user-defined measurement units
 	"""
 
 	def __init__(self):
-		BinIOBase.__init__(self)
 		self.factor=0
 		self.numDigits=0
 		self.id=''
@@ -558,22 +565,36 @@ class GimpUserUnits(BinIOBase):
 		self.sname=''
 		self.pname=''
 
-	def _decode_(self,data,idx=0):
+	def fromBytes(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		self.factor=self._float_()
-		self.numDigits=self._u32_()
-		self.id=self._sz754_()
-		self.symbol=self._sz754_()
-		self.abbrev=self._sz754_()
-		self.sname=self._sz754_()
-		self.pname=self._sz754_()
-		return self._idx
+		io=IO(data,index)
+		self.factor=io.float32
+		self.numDigits=io.u32
+		self.id=io.sz754
+		self.symbol=io.sz754
+		self.abbrev=io.sz754
+		self.sname=io.sz754
+		self.pname=io.sz754
+		return io.index
+		
+	def toBytes(self):
+		"""
+		convert this object to raw bytes
+		"""
+		io=IO()
+		io.float32=self.factor
+		io.u32=self.numDigits
+		io.sz754=self.id
+		io.sz754=self.symbol
+		io.sz754=self.abbrev
+		io.sz754=self.sname
+		io.sz754=self.pname
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""

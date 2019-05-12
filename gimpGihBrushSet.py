@@ -12,7 +12,7 @@ from binaryIO import *
 from gimpGbrBrush import *
 	
 
-class GimpGihBrushSet(BinIOBase):
+class GimpGihBrushSet(object):
 	"""
 	Gimp Image Pipe Format
 
@@ -24,7 +24,6 @@ class GimpGihBrushSet(BinIOBase):
 	"""
 
 	def __init__(self,filename):
-		BinIOBase.__init__(self)
 		self.filename=None
 		self.name=''
 		self.params={}
@@ -48,36 +47,18 @@ class GimpGihBrushSet(BinIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		BinIOBase._decode_(self,data,idx)
-		name=[]
-		while True:
-			c=self._asciiz_(1)
-			if c=='\r':
-				pass
-			elif c=='\n':
-				break
-			else:
-				name.append(c)
-		self.name=''.join(name)
-		secondLine=[]
-		while True:
-			c=self._asciiz_(1)
-			if c=='\r':
-				pass
-			elif c=='\n':
-				break
-			else:
-				secondLine.append(c)
+		io=IO(data,index)
+		name=io.textLine
+		secondLine=io.textLine.split(' ')
 		self.params={}
-		secondLine=(''.join(secondLine)).split(' ')
-		numBrushes=secondLine[0]
+		numBrushes=int(secondLine[0])
 		# everything that's left is a gimp-image-pipe-parameters parasite 
 		for i in range(1,len(secondLine)): 
 			param=secondLine[i].split(':',1)
@@ -85,16 +66,35 @@ class GimpGihBrushSet(BinIOBase):
 		self.brushes=[]
 		for i in numBrushes:
 			b=GimpGbrBrush()
-			b._decode_(self._data,self._idx)
+			io.index=b._decode_(io.data,io.index)
 			self.brushes.append(b)
-		return self._idx
+		return io.index
+		
+	def toBytes(self):
+		"""
+		encode this object to a byte array
+		"""
+		io=IO()
+		io.textLine=name
+		# add the second line of data
+		secondLine=[str(len(self.brushes))]
+		for k,v in self.params.items:
+			secondLine.append(k+':'+str(v))
+		io.textLine=' '.join(secondLine)
+		# add the brushes
+		self.brushes=[]
+		for brush in brushes:
+			io.addBytes(brush.toBytes())
+		return io.data
 
 	def save(self,toFilename=None,toExtension=None):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
-
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
+		
 	def __repr__(self,indent=''):
 		"""
 		Get a textual representation of this object
@@ -140,16 +140,16 @@ if __name__ == '__main__':
 					else:
 						g.brushes[int(arg[1])].image.show()
 				elif arg[0]=='--save':
-					idx,filename=arg[1].split(',',1)
+					index,filename=arg[1].split(',',1)
 					if filename.find('*')<0:
 						filename='*.'.join(filename.split('.',1))
-					if idx=='*':
+					if index=='*':
 						for i in range(len(g.brushes)):
 							fn2=filename.replace('*',str(i))
 							g.brushes[i].image.save(fn2)
 					else:
 						fn2=filename.replace('*',i)
-						g.brushes[int(idx)].image.save(fn2)
+						g.brushes[int(index)].image.save(fn2)
 				else:
 					print 'ERR: unknown argument "'+arg[0]+'"'
 			else:

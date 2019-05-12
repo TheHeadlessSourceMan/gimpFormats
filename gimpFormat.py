@@ -4,6 +4,13 @@
 Pure python implementation of the gimp file formats
 """
 from gimpXcfDocument import *
+from gimpGbrBrush import *
+from gimpGgrGradient import *
+from gimpGihBrush import *
+from gimpGpbBrush import *
+from gimpGtpToolPreset import *
+from gimpPatPattern import *
+from gimpVbrBrush import *
 
 
 if __name__ == '__main__':

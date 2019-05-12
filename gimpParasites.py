@@ -1,41 +1,64 @@
 #!/usr/bin/env
 # -*- coding: utf-8 -*-
 """
-arbitrary data that can be attached to any tree item
+Parasites are arbitrary (meta)data strings that can be attached to a document tree item
 
-List of known parasites: #TODO: integrate these!
+They are used to store things like last-used plugin settings, gamma adjuetments, etc.
+
+Format of known parasites:
 	https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/parasites.txt
 """
 from binaryIO import *
 
 
-class GimpParasite(BinIOBase):
-	"""
-	arbitrary data that can be attached to any tree item
+#TODO: how to best use these for our puproses??
+KNOWN_DOCUMENT_PARASITES=["jpeg-save-defaults","png-save-defaults","<plug-in>/_fu_data","exif-orientation-rotate"]
+KNOWN_IMAGE_PARASITES=["gimp-comment","gimp-brush-name","gimp-brush-pipe-name","gimp-brush-pipe-parameters","gimp-image-grid","gimp-pattern-name","tiff-save-options","jpeg-save-options","jpeg-exif-data","jpeg-original-settings","gamma","chromaticity","rendering-intent","hot-spot","exif-data","gimp-metadata","icc-profile","icc-profile-name","decompose-data","print-settings","print-page-setup","dcm/XXXX-XXXX-AA"]
+KNOWN_LAYER_PARASITES=["gimp-text-layer","gfig"]
 
-	List of known parasites: #TODO: integrate these!
+
+class GimpParasite(object):
+	"""
+	Parasites are arbitrary (meta)data strings that can be attached to a document tree item
+
+	They are used to store things like last-used plugin settings, gamma adjuetments, etc.
+
+	Format of known parasites:
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/parasites.txt
 	"""
 
 	def __init__(self):
-		BinIOBase.__init__(self)
 		self.name=''
 		self.flags=0
 		self.data=None
 
-	def _decode_(self,data,idx=0):
+	def fromBytes(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		BinIOBase._decode_(self,data,idx)
-		self.name=self._sz754_()
-		self.flags=self._u32_()
-		dataLength=self._u32_()
-		self.data=self._bytes_(dataLength)
-		return self._idx
+		io=IO(data,index)
+		self.name=io.sz754
+		self.flags=io.u32
+		dataLength=io.u32
+		self.data=io.getBytes(dataLength)
+		return io.index
+		
+	def toBytes(self):
+		"""
+		decode a byte buffer
+
+		:param data: data buffer to decode
+		:param index: index within the buffer to start at
+		"""
+		io=IO()
+		io.sz754=self.name
+		io.u32=self.flags
+		io.u32=len(self.data)
+		io.addBytes(self.data)
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""

@@ -27,36 +27,60 @@ class GimpLayer(GimpIOBase):
 	"""
 
 	COLOR_MODES=['RGB color without alpha','RGB color with alpha','Grayscale without alpha','Grayscale with alpha','Indexed without alpha','Indexed with alpha']
+	PIL_MODE_TO_LAYER_MODE={'L':2,'LA':3,'RGB':0,'RGBA':1}
 
-	def __init__(self,parent):
+	def __init__(self,parent,name=None,image=None):
 		GimpIOBase.__init__(self,parent)
 		self.width=0
 		self.height=0
 		self.colorMode=0
-		self.name=None
+		self.name=name
 		self._imageHeierarchy=None
 		self._imageHeierarchyPtr=None
 		self._mask=None
 		self._maskPtr=None
+		self._data=None
+		if image is not None:
+			self.image=image # done last as it resets some of the above defaults
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		#print 'Decoding Layer at',idx
-		self.width=self._u32_()
-		self.height=self._u32_()
-		self.colorMode=self._u32_() # one of self.COLOR_MODES
-		self.name=self._sz754_()
-		self._propertiesDecode_()
-		self._imageHeierarchyPtr=self._pointer_()
-		self._maskPtr=self._pointer_()
+		io=IO(data,index)
+		#print 'Decoding Layer at',index
+		self.width=io.u32
+		self.height=io.u32
+		self.colorMode=io.u32 # one of self.COLOR_MODES
+		self.name=io.sz754
+		self._propertiesDecode_(io)
+		self._imageHeierarchyPtr=self._pointerDecode_(io)
+		self._maskPtr=self._pointerDecode_(io)
 		self._mask=None
-		return self._idx
+		self._data=data
+		return io.index	
+		
+	def toBytes(self):
+		"""
+		encode to byte array
+		"""
+		dataAreaIO=IO()
+		io=IO()
+		io.u32=self.width
+		io.u32=self.height
+		io.u32=self.colorMode
+		io.sz754=self.name
+		dataAreaIndex=io.index+self._POINTER_SIZE_*2
+		io.addBytes(self._pointerEncode_(dataAreaIndex))
+		dataAreaIO.addBytes(self._propertiesEncode_())
+		io.addBytes(self._pointerEncode_(dataAreaIndex))
+		dataAreaIO.addBytes(self.mask.toBytes())
+		io.addBytes(self._pointerEncode_(dataAreaIndex+dataAreaIO.index))
+		io.addBytes(dataAreaIO)
+		return io.data
 
 	@property
 	def mask(self):
@@ -65,19 +89,36 @@ class GimpLayer(GimpIOBase):
 		"""
 		if self._mask is None and self._maskPtr is not None and self._maskPtr!=0:
 			self._mask=GimpChannel(self)
-			self._mask._decode_(self._data,self._maskPtr)
+			self._mask.fromBytes(self._data,self._maskPtr)
 		return self._mask
 
 	@property
 	def image(self):
 		"""
-		get a final, compiled image
+		get the layer image
 
 		NOTE: can return None!
 		"""
 		if self.imageHierarchy is None:
 			return None
 		return self.imageHierarchy.image
+	@image.setter
+	def image(self,image):
+		"""
+		set the layer image
+		
+		NOTE: resets layer width, height, and colorMode
+		"""
+		self.height=image.height
+		self.width=image.width
+		if not self.PIL_MODE_TO_LAYER_MODE.has_key(image.mode):
+			raise NotImplementedError('No way of handlng PIL image mode "'+image.mode+'"')
+		self.colorMode=self.PIL_MODE_TO_LAYER_MODE[image.mode]
+		if not self.name and isinstance(image,basestring):
+			# try to use a filename as the name
+			self.name=image.rsplit('\\',1)[-1].rsplit('/',1)[-1]
+		self.imageHierarchy=GimpImageHierarchy(self)
+		self.imageHierarchy.image=image
 
 	@property
 	def imageHierarchy(self):
@@ -86,11 +127,23 @@ class GimpLayer(GimpIOBase):
 
 		This is mainly needed for deciphering image, and therefore,
 		of little use to you, the user.
+		
+		NOTE: can return None if it has been fully read into an image
 		"""
 		if self._imageHeierarchy is None and self._imageHeierarchyPtr>0:
 			self._imageHeierarchy=GimpImageHierarchy(self)
-			self._imageHeierarchy._decode_(self._data,self._imageHeierarchyPtr)
+			self._imageHeierarchy.fromBytes(self._data,self._imageHeierarchyPtr)
 		return self._imageHeierarchy
+		
+	def _forceFullyLoaded(self):
+		"""
+		make sure everything is fully loaded from the file
+		"""
+		if self.mask is not None:
+			self.mask._forceFullyLoaded()
+		_=self.image # make sure the image is loaded so we can delete the hierarchy nonsense
+		self._imageHeierarchy=None
+		self._data=None
 
 	def __repr__(self,indent=''):
 		"""
@@ -135,9 +188,42 @@ class GimpDocument(GimpIOBase):
 		3:'16-bit linear floating point',
 		4:'32-bit linear floating point',
 	}
+	PRECISION_CODE_GAMMA={ # whether gamma should be applied to a given precision code
+		100:False,150:True,200:False,250:True,300:False,350:True,500:False,550:True,
+		600:False,650:True,700:False,750:True,0:True,1:True,2:False,3:False,4:False}
+	PRECISION_CODE_BITS={ # number of bits for any given precision code
+		100:8,150:8,200:16,250:16,300:32,350:32,500:16,550:16,600:32,650:32,700:64,750:64,0:8,1:16,2:32,3:16,4:32}
+	PRECISION_CODE_DATATYPE={ # python data type for precision code (int or float)
+		100:int,150:int,200:int,250:int,300:int,350:int,500:float,550:float,
+		600:float,650:float,700:float,750:float,0:int,1:int,2:int,3:float,4:float}
+	
+	@classmethod
+	def findPrecisionCode(clazz,pythonType,bits,gamma=False):
+		"""
+		find the proper precision code that fits the parameters
+		
+		:param pythonType: float or int
+		:param bits: number of bits (8,16,32, or 64)
+		:param gamma: whether to use gamma (default=False)
+		
+		:return: precision code -- if parameters are not illegal, this should always return
+			if they are, you'll get a big fat array index out of bounds exception.
+		"""
+		valid=[100,150,200,250,300,350,500,550,600,650,700,750]
+		for k,v in PRECISION_CODE_BITS.items():
+			if k>=100 and v!=bits:
+				valid.remove(k)
+		for k,v in PRECISION_CODE_DATATYPE.items():
+			if k>=100 and v!=pythonType:
+				valid.remove(k)
+		for k,v in PRECISION_CODE_GAMMA.items():
+			if k>=100 and v!=gamma:
+				valid.remove(k)
+		return valid[0]
 
 	def __init__(self,filename):
 		GimpIOBase.__init__(self,self)
+		self.dirty=False # a file-changed indicator.  # TODO: Not fully implemented.
 		self._layers =None
 		self._layerPtr=[]
 		self.channels=[]
@@ -166,66 +252,189 @@ class GimpDocument(GimpIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		if self._asciiz_(9)!="gimp xcf ":
+		io=IO(data,index)
+		if io.getBytes(9)!="gimp xcf ":
 			raise Exception('Not a valid GIMP file')
-		version=self._asciiz_()
+		version=io.cString
 		if version=='file':
 			self.version=0
 		else:
 			self.version=int(version[1:])
 		#print 'Gimp version',self.version,self._POINTER_SIZE_
-		self.width=self._u32_()
-		self.height=self._u32_()
-		self.baseColorMode=self._u32_()
-		self.precision=self._u32_()
-		self._propertiesDecode_()
+		self.width=io.u32
+		self.height=io.u32
+		self.baseColorMode=io.u32
+		self.precision=io.u32
+		self._propertiesDecode_(io)
 		self._layerPtr=[]
 		self._layers=[]
 		while True:
-			ptr=self._pointer_()
+			ptr=self._pointerDecode_(io)
 			if ptr==0:
 				break
 			self._layerPtr.append(ptr)
 			l=GimpLayer(self)
-			l._decode_(self._data,ptr)
+			l._decode_(io.data,ptr)
 			self._layers.append(l)
 		self._channelPtr=[]
 		self.channels=[]
 		while True:
-			ptr=self._pointer_()
+			ptr=self._pointerDecode_(io)
 			if ptr==0:
 				break
 			self._channelPtr.append(ptr)
 			c=GimpChannel(self)
-			c._decode_(self._data,ptr)
+			c._decode_(io.data,ptr)
 			self.channels.append(c)
-		return self._idx
+		return io.index
+		
+	def toBytes(self):
+		"""
+		encode to a byte array
+		"""
+		io=IO()
+		io.addBytes("gimp xcf ")
+		io.addBytes(str(version)+'\0')
+		io.u32=self.width
+		io.u32=self.height
+		io.u32=self.baseColorMode
+		io.u32=self.precision
+		io.addBytes(self._propertiesEncode_())
+		dataAreaIdx=io.index+self._POINTER_SIZE_*(self.layers+self.channels)
+		dataAreaIo=IO()
+		for layer in self.layers:
+			io.pointer=dataAreaIdx+dataAreaIo.index
+			dataAreaIo.addBytes(layer.toBytes())
+		for channel in self.channels:
+			io.pointer=dataAreaIdx+dataAreaIo.index
+			dataAreaIo.addBytes(channel.toBytes())
+		return io.data
+
+	def _forceFullyLoaded(self):
+		"""
+		make sure everything is fully loaded from the file
+		"""
+		for layer in self.layers:
+			layer._forceFullyLoaded()
+		for chan in self.channels:
+			chan._forceFullyLoaded()
+		# no longer try to get the data from file
+		self._layerPtr=None
+		self._channelPtr=None
+		self._data=None
 
 	@property
 	def layers(self):
 		"""
 		Decode the image's layers if necessary
+		
+		TODO: need to do the same thing with self.Channels
 		"""
 		if self._layers is None:
 			self._layers=[]
 			for ptr in self._layerPtr:
 				l=GimpLayer(self)
-				l._decode_(self._data,ptr)
+				l.fromBytes(self.data,ptr)
 				self._layers.append(l)
+			# add a reference back to this object so it doesn't go away while array is in use
+			self._layers_.parent=self
+			# override some internal methods so we can do more with them
+			self._layers._actualDelitem_=self._layers.__delitem__
+			self._layers.__delitem__=self.deleteLayer
+			self._layers._actualSetitem_=self._layers.__delitem__
+			self._layers.__setitem__=self.setLayer
 		return self._layers
+			
+	def getLayer(self,index):
+		"""
+		return a given layer
+		"""
+		return self.layers[index]
+	def setLayer(self,index,layer):
+		"""
+		assign to a given layer
+		"""
+		self._forceFullyLoaded()
+		self.dirty=True
+		self._layerPtr=None # no longer try to use the pointers to get data
+		layers._actualSetitem_(index,layer)
+		
+	def newLayer(self,name,image,index=-1):
+		"""
+		create a new layer based on a PIL image
+		
+		:param name: a name for the new layer
+		:param index: where to insert the new layer (default=top)
+		:return: newly created GimpLayer object
+		"""
+		layer=GimpLayer(self,name,image)
+		self.insertLayer(layer,index)
+		return layer
+		
+	def newLayerFromClipboard(self,name='pasted',index=-1):
+		"""
+		Create a new image from the system clipboard.
+		
+		:param name: a name for the new layer (default="pasted")
+		:param index: where to insert the new layer (default=top)
+		:return: newly created GimpLayer object
+		
+		NOTE: requires pillow PIL implementation
+		NOTE: only works on OSX and Windows
+		"""
+		import PIL.ImageGrab
+		image=PIL.ImageGrab.grabclipboard()
+		return self.newLayer(name,image,index)
+	
+	def addLayer(self,layer):
+		"""
+		append a layer object to the document
+		
+		:param layer: the new layer to append
+		"""
+		self.insertLayer(layer,-1)
+	def appendLayer(self,layer):
+		"""
+		append a layer object to the document
+		
+		:param layer: the new layer to append
+		"""
+		self.insertLayer(layer,-1)
+		
+	def insertLayer(self,layer,index=-1):
+		"""
+		insert a layer object at a specific position
+		
+		:param layer: the new layer to insert
+		:param index: where to insert the new layer (default=top)
+		"""
+		self.layers.insert(index,layer)
+		
+	def deleteLayer(self,index):
+		"""
+		delete a layer
+		"""
+		self.__delitem__(index)
 
+	# make this class act like this class is an array of layers
 	def __len__(self):
 		return len(self.layers)
-	def __getitem__(self,idx):
-		return self.layers.__getitem__(idx)
+	def __getitem__(self,index):
+		return self.layers[index]
+	def __setitem__(self,index,layer):
+		self.setLayer(layer,index)
+	def __delitem__(self,index):
+		self.deleteLayer(index)
+	def __inc__(self,amt):
+		self.appendLayer(amt)
+		return self
 
 	@property
 	def image(self):
@@ -238,7 +447,10 @@ class GimpDocument(GimpIOBase):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
+		self.dirty=False
 
 	def __repr__(self,indent=''):
 		"""

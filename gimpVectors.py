@@ -4,6 +4,7 @@
 Stuff related to vectors/paths within a gimp document
 """
 from gimpIoBase import GimpIOBase
+from binaryIO import *
 
 
 class GimpVector(GimpIOBase):
@@ -20,29 +21,46 @@ class GimpVector(GimpIOBase):
 		self.parasites=[]
 		self.strokes=[]
 
-	def _decode_(self,data,idx=0):
+	def fromBytes(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		self.name=self._sz754_()
-		self.uniqueId=self._u32_()
-		self.visible=self._u32_()==1
-		self.linked=self._u32_()==1
-		numParasites=self._u32_()
-		numStrokes=self._u32_()
+		io=IO(data,index,boolSize=32)
+		self.name=io.sz754
+		self.uniqueId=io.u32
+		self.visible=io.bool
+		self.linked=io.bool
+		numParasites=io.u32
+		numStrokes=io.u32
 		for _ in range(numParasites):
 			p=GimpParasite()
-			self._idx=p._decode_(self._data,self._idx)
+			io.index=p.fromBytes(io.data,io.index)
 			self.parasites.append(p)
 		for _ in range(numStrokes):
 			gs=GimpStroke(self)
-			self._idx=gs._decode_(self._data,self._idx)
+			io.index=gs.fromBytes(io.data,io.index)
 			self.strokes.append(p)
-		return self._idx
+		return io.index
+		
+	def toBytes(self):
+		"""
+		encode to binary data
+		"""
+		io=IO(boolSize=32)
+		io.sz754=self.name
+		io.u32=self.uniqueId
+		io.bool=self.visible
+		io.bool=self.linked
+		io.u32=len(self.parasites)
+		io.u32=len(self.strokes)
+		for p in self.parasites:
+			io.addBytes(p.toBytes())
+		for gs in self.strokes:
+			io.addBytes(gs.toBytes())
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""
@@ -77,23 +95,36 @@ class GimpStroke(GimpIOBase):
 		self.closedShape=True
 		self.points=[]
 
-	def _decode_(self,data,idx=0):
+	def fromBytes(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		GimpIOBase._decode_(self,data,idx)
-		self.strokeType=self._u32_()
-		self.closedShape=self._u32_()==1
-		numFloatsPerPoint=self._u32_()
-		numPoints=self._u32_()
+		io=IO(data,index,boolSize=32)
+		self.strokeType=io.u32
+		self.closedShape=io.bool
+		numFloatsPerPoint=io.u32
+		numPoints=io.u32
 		for _ in range(numPoints):
 			gp=GimpPoint(self)
-			self._idx=gp._decode_(self._data,self._idx,numFloatsPerPoint)
+			io.index=gp.fromBytes(io.data,io.index,numFloatsPerPoint)
 			self.points.append(gp)
-		return self._idx
+		return io.index
+		
+	def toBytes(self):
+		"""
+		encode to binary data
+		"""
+		io=IO(boolSize=32)
+		io.u32=self.strokeType
+		io.bool=self.closedShape
+		io.u32=numFloatsPerPoint
+		io.u32=numPoints
+		for gp in self.points:
+			io.addBytes(gp.toBytes())
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""
@@ -125,35 +156,53 @@ class GimpPoint(GimpIOBase):
 		self.wheel=0.5
 		self.pointType=0
 
-	def _decode_(self,data,idx=0,numFloatsPerPoint=0):
+	def fromBytes(self,data,index=0,numFloatsPerPoint=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		:param numFloatsPerPoint: required so we know
 			how many different brush dynamic measurements are
 			inside each point
 		"""
+		io=IO(data,index,boolSize=32)
 		self.pressure=1.0
 		self.xTilt=0.5
 		self.yTilt=0.5
 		self.wheel=0.5
-		GimpIOBase._decode_(self,data,idx)
-		self.pointType=self._u32_()
+		self.pointType=io.u32
 		if numFloatsPerPoint<1:
-			numFloatsPerPoint=(len(data)-self._idx)/4
-		self.x=self._float_()
-		self.y=self._float_()
+			numFloatsPerPoint=(len(io.data)-io.index)/4
+		self.x=io.float
+		self.y=io.float
 		if numFloatsPerPoint>2:
-			self.pressure=self._float_()
+			self.pressure=io.float
 			if numFloatsPerPoint>3:
-				self.xTilt=self._float_()
+				self.xTilt=io.float
 				if numFloatsPerPoint>4:
-					self.yTilt=self._float_()
+					self.yTilt=io.float
 					if numFloatsPerPoint>5:
-						self.wheel=self._float_()
-		return self._idx
+						self.wheel=io.float
+		return io.index
+		
+	def toBytes(self):
+		"""
+		encode to binary data
+		"""
+		io=IO(boolSize=32)
+		io.u32=self.pointType
+		io.float=self.x
+		io.float=self.y
+		if self.pressure is not None:
+			io.float=self.pressure
+			if self.xTilt is not None:
+				io.float=self.xTilt
+				if self.yTilt is not None:
+					io.float=self.yTilt
+					if self.wheel is not None:
+						io.float=self.wheel
+		return io.data
 
 	def __repr__(self,indent=''):
 		"""

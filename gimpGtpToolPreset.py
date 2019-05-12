@@ -5,7 +5,7 @@ Pure python implementation of the gimp gtp tool preset format
 """
 import struct
 import PIL.Image
-from binaryIO import *
+
 	
 class ParenFileValue(object):
 	
@@ -38,70 +38,76 @@ class ParenFileValue(object):
 				ret.append(str(v))
 		return ('\n'+indent).join(ret)
 		
-def parenFileDecode(data,idx=0):
+def parenFileDecode(data,index=0):
 	values=[]
-	def pDec(data,idx=0):
+	def pDec(data,index=0):
 		pval=ParenFileValue()
 		ws=[' ','\t','\r','\n']
-		if idx==0:
+		if index==0:
 			while True:
-				c=data[idx]
-				idx+=1
+				c=data[index]
+				index+=1
 				if c=='(':
 					break
 		building=[]
 		while True:
 			while True: # skip any whitespace
-				c=data[idx]
+				c=data[index]
 				if c!=' ':
 					break
-				idx+=1
+				index+=1
 			while c not in ws and c!=')':
 				building.append(c)
-				c=data[idx]
-				idx+=1
+				c=data[index]
+				index+=1
 			pval.valueType=''.join(building)
 			building=[]
 			while True: # for each value
 				pval._addValue(building)
 				building=[]
 				while True: # skip any whitespace
-					c=data[idx]
+					c=data[index]
 					if c not in ws:
 						break
-					idx+=1
+					index+=1
 				if c==')': # finished
 					pval._addValue(building)
-					return idx+1,pval
+					return index+1,pval
 				elif c=='(': # child value
-					idx,v=pDec(data,idx+1)
+					index,v=pDec(data,index+1)
 					pval.values.append(v)
 				elif c=='"': # parse a whole string
 					building.append(c)
 					while True:
-						idx+=1
-						c=data[idx]
+						index+=1
+						c=data[index]
 						building.append(c)
 						if c=='"':
 							break
 					pval._addValue(building)
 					building=[]
-					idx+=1
+					index+=1
 				else:
 					building.append(c)
-					idx+=1
+					index+=1
 	while True:
-		idx,pval=pDec(data,idx)
+		index,pval=pDec(data,index)
 		values.append(pval)
-	return idx,values
+	return index,values
+	
+def parenFileEncode(values):
+	"""
+	encode a values tree to a buffer
+	"""
+	raise NotImplementedError()
 
-class GimpGtpToolPreset(BinIOBase):
+
+class GimpGtpToolPreset(object):
 	"""
 	Pure python implementation of the gimp gtp tool preset format
 	"""
 
 	def __init__(self,filename):
-		BinIOBase.__init__(self)
 		self.filename=None
 		self.values=[]
 		if filename is not None:
@@ -123,17 +129,21 @@ class GimpGtpToolPreset(BinIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		BinIOBase._decode_(self,data,idx)
-		self._idx,values=parenFileDecode(data)
-		self.values=values
-		return self._idx
+		index,self.values=parenFileDecode(data,index)
+		return index
+		
+	def toBytes(self):
+		"""
+		encode to a byte array
+		"""
+		return parenFileEncode(self.values)
 
 	def save(self,toFilename=None,toExtension=None):
 		"""

@@ -8,7 +8,7 @@ import PIL.Image
 from binaryIO import *
 	
 
-class GimpPatPattern(BinIOBase):
+class GimpPatPattern(object):
 	"""
 	Pure python implementation of a gimp pattern file
 
@@ -19,7 +19,6 @@ class GimpPatPattern(BinIOBase):
 	COLOR_MODES=[None,'L','LA','RGB','RGBA']
 
 	def __init__(self,filename=None):
-		BinIOBase.__init__(self)
 		self.filename=None
 		self.version=1
 		self.width=0
@@ -27,7 +26,7 @@ class GimpPatPattern(BinIOBase):
 		self.bpp=4
 		self.mode=self.COLOR_MODES[self.bpp]
 		self.name=''
-		self.rawImage=None
+		self._rawImage=None
 		if filename is not None:
 			self.load(filename)
 
@@ -47,29 +46,52 @@ class GimpPatPattern(BinIOBase):
 		f.close()
 		self._decode_(data)
 
-	def _decode_(self,data,idx=0):
+	def _decode_(self,data,index=0):
 		"""
-		decode a byte buffer as a gimp file
+		decode a byte buffer
 
 		:param data: data buffer to decode
-		:param idx: index within the buffer to start at
+		:param index: index within the buffer to start at
 		"""
-		BinIOBase._decode_(self,data,idx)
-		headerSize=self._u32_()
-		self.version=self._u32_()
-		self.width=self._u32_()
-		self.height=self._u32_()
-		self.bpp=self._u32_()
+		io=IO(data,index)
+		headerSize=io.u32
+		self.version=io.u32
+		self.width=io.u32
+		self.height=io.u32
+		self.bpp=io.u32
 		self.mode=self.COLOR_MODES[self.bpp]
-		magic=self._asciiz_(4)
+		magic=io.getBytes(4)
 		if magic!='GPAT':
 			raise Exception('File format error.  Magic value mismatch.')
-		nameLen=headerSize-self._idx
-		self.name=self._asciiz_(nameLen).decode('UTF-8')
-		self.rawImage=self._asciiz_(self.width*self.height*self.bpp)
+		nameLen=headerSize-io.index
+		self.name=io.getBytes(nameLen).decode('UTF-8')
+		self._rawImage=io.getBytes(self.width*self.height*self.bpp)
+		self._image=None
+		
+	def toBytes(self):
+		"""
+		encode to a byte buffer
+		"""
+		io=IO()
+		io.u32=24+len(self.name)
+		io.u32=self.version
+		io.u32=self.width
+		io.u32=self.height
+		io.u32=len(self.image.mode)
+		io.addBytes('GPAT')
+		io.addBytes(self.name)
+		if self._rawImage is None:
+			rawImage=self.image.tobytes(encoder_name='raw')
+		else:
+			rawImage=self._rawImage
+		io.addBytes(rawImage)
+		return io.data
 
 	@property
 	def size(self):
+		"""
+		the size of the pattern
+		"""
 		return (self.width,self.height)
 
 	@property
@@ -77,15 +99,23 @@ class GimpPatPattern(BinIOBase):
 		"""
 		get a final, compiled image
 		"""
-		if self.rawImage is None:
-			return None
-		return PIL.Image.frombytes(self.mode,self.size,self.rawImage,decoder_name='raw')
+		if self._image==None:
+			if self._rawImage is None:
+				return None
+			self._image=PIL.Image.frombytes(self.mode,self.size,self._rawImage,decoder_name='raw')
+		return self._image
+	@image.setter
+	def image(self,image):
+		self._image=image
+		self._rawImage=None
 
 	def save(self,toFilename=None,toExtension=None):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		if not hasattr(toFilename,'write'):
+			f=open(toFilename,'wb')
+		f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""
