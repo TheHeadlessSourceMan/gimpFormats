@@ -13,7 +13,7 @@ class IO(object):
 	Class to handle i/o to a byte buffer or file-like object
 	"""
 	
-	def __init__(self,data=0,idx=0,littleEndian=False,boolSize=8,stringEncoding='U'):
+	def __init__(self,data=None,idx=0,littleEndian=False,boolSize=8,stringEncoding='U'):
 		"""
 		:param data: can be a data buffer or a file-like object
 		:param idx: start reading/writing the data at the given index
@@ -21,12 +21,23 @@ class IO(object):
 		:param boolSize: how many default bits to use for a bool (8,16,32,or 64)
 		:param stringEncoding: default string encoding A=Ascii, U=UTF-8, W-Unicode wide
 		"""
+		if data is None:
+			data=bytearray()
 		self.data=data
 		self.index=idx
 		self._contexts=[]
 		self.littleEndian=littleEndian
 		self.boolSize=boolSize
 		self.stringEncoding=stringEncoding # A=Ascii, U=UTF-8, W-Unicode wide
+	
+	@property
+	def data(self):
+		return self._data
+	@data.setter
+	def data(self,data):
+		if not hasattr(data,"__getitem__"):
+			raise Exception('ERR: incorrect type for data buffer'+str(type(data)))
+		self._data=data	
 	
 	def beginContext(self,newIndex):
 		"""
@@ -40,6 +51,19 @@ class IO(object):
 		"""
 		self.index=self.contexts.pop()
 
+	def _write(self,size,fmt,data):
+		"""
+		general formatted write
+		"""
+		if self.index+size>=len(self.data):
+			self.data.extend(bytearray((self.index+size)-len(self.data)))
+		try:
+			struct.pack_into(fmt,self.data,self.index,data)
+		except struct.error,e:
+			print type(data),fmt,size
+			print data
+			raise e
+
 	@property
 	def bool(self):
 		if self.boolSize==8:
@@ -50,18 +74,19 @@ class IO(object):
 			return self.bool32
 		if self.boolSize==64:
 			return self.bool64
-		raise Exception("Unknown bool size")
+		raise Exception("Unknown bool size "+str(self.boolSize))
 	@bool.setter
 	def bool(self,bool):
 		if self.boolSize==8:
 			self.bool8=bool
-		if self.boolSize==16:
+		elif self.boolSize==16:
 			self.bool16=bool
-		if self.boolSize==32:
+		elif self.boolSize==32:
 			self.bool32=bool
-		if self.boolSize==64:
+		elif self.boolSize==64:
 			self.bool64=bool
-		raise Exception("Unknown bool size")
+		else:
+			raise Exception("Unknown bool size "+str(self.boolSize))
 	
 	@property	
 	def bool8(self):
@@ -248,8 +273,7 @@ class IO(object):
 		return d
 	@u8be.setter
 	def u8be(self,u8be):
-		pack_into('>B',self.data,self.index,u8be)
-		self.index+=1
+		self._write(1,'>B',u8be)
 	@property
 	def u8le(self):
 		"""
@@ -260,8 +284,7 @@ class IO(object):
 		return d
 	@u8le.setter
 	def u8le(self,u8le):
-		pack_into('<B',self.data,self.index,u8le)
-		self.index+=1
+		self._write(1,'<B',u8le)
 	@property
 	def i8le(self):
 		"""
@@ -272,8 +295,7 @@ class IO(object):
 		return d
 	@i8le.setter
 	def i8le(self,i8le):
-		pack_into('<b',self.data,self.index,i8le)
-		self.index+=1
+		self._write(1,'<b',i8le)
 	@property
 	def i8be(self):
 		"""
@@ -284,8 +306,7 @@ class IO(object):
 		return d
 	@i8be.setter
 	def i8be(self,i8be):
-		pack_into('>b',self.data,self.index,i8be)
-		self.index+=1
+		self._write(1,'>b',i8be)
 		
 	@property
 	def u16be(self):
@@ -297,8 +318,7 @@ class IO(object):
 		return d
 	@u16be.setter
 	def u16be(self,u16be):
-		pack_into('>H',self.data,self.index,u16be)
-		self.index+=2
+		self._write(2,'>H',u16be)
 	@property
 	def u16le(self):
 		"""
@@ -309,8 +329,7 @@ class IO(object):
 		return d
 	@u16le.setter
 	def u16le(self,u16le):
-		pack_into('<H',self.data,self.index,u16le)
-		self.index+=2
+		self._write(2,'<H',u16le)
 	@property
 	def i16le(self):
 		"""
@@ -321,8 +340,7 @@ class IO(object):
 		return d
 	@i16le.setter
 	def i16le(self,i16le):
-		pack_into('<h',self.data,self.index,i16le)
-		self.index+=2
+		self._write(2,'<h',i16le)
 	@property
 	def i16be(self):
 		"""
@@ -333,8 +351,7 @@ class IO(object):
 		return d
 	@i16be.setter
 	def i16be(self,i16be):
-		pack_into('>h',self.data,self.index,i16be)
-		self.index+=2
+		self._write(2,'>h',i16be)
 		
 	@property
 	def u32be(self):
@@ -346,8 +363,7 @@ class IO(object):
 		return d
 	@u32be.setter
 	def u32be(self,u32be):
-		pack_into('>I',self.data,self.index,u32be)
-		self.index+=4
+		self._write(4,'>I',u32be)
 	@property
 	def u32le(self):
 		"""
@@ -358,8 +374,7 @@ class IO(object):
 		return d
 	@u32le.setter
 	def u32le(self,u32le):
-		pack_into('<I',self.data,self.index,u32le)
-		self.index+=4
+		self._write(4,'<I',u32le)
 	@property
 	def i32le(self):
 		"""
@@ -370,8 +385,7 @@ class IO(object):
 		return d
 	@i32le.setter
 	def i32le(self,i32le):
-		pack_into('<i',self.data,self.index,i32le)
-		self.index+=4
+		self._write(4,'<i',i32le)
 	@property
 	def i32be(self):
 		"""
@@ -382,8 +396,7 @@ class IO(object):
 		return d
 	@i32be.setter
 	def i32be(self,i32be):
-		pack_into('>i',self.data,self.index,i32be)
-		self.index+=4
+		self._write(4,'>i',i32be)
 		
 	@property
 	def u64be(self):
@@ -395,8 +408,7 @@ class IO(object):
 		return d
 	@u64be.setter
 	def u64be(self,u64be):
-		pack_into('>Q',self.data,self.index,u64be)
-		self.index+=8
+		self._write(8,'>Q',u64be)
 	@property
 	def u64le(self):
 		"""
@@ -407,8 +419,7 @@ class IO(object):
 		return d
 	@u64le.setter
 	def u64le(self,u64le):
-		pack_into('<Q',self.data,self.index,u64le)
-		self.index+=8
+		self._write(8,'<Q',u64le)
 	@property
 	def i64le(self):
 		"""
@@ -419,7 +430,7 @@ class IO(object):
 		return d
 	@i64le.setter
 	def i64le(self,i64le):
-		pack_into('<q',self.data,self.index,i64le)
+		self._write(8,'<q',i64le)
 		self.index+=8
 	@property
 	def i64be(self):
@@ -431,8 +442,7 @@ class IO(object):
 		return d
 	@i64be.setter
 	def i64be(self,i64be):
-		pack_into('>q',self.data,self.index,i64be)
-		self.index+=8
+		self._write(8,'>q',i64be)
 		
 	@property
 	def float(self):
@@ -456,8 +466,7 @@ class IO(object):
 		return d
 	@float32be.setter
 	def float32be(self,float32be):
-		pack_into('>f',self.data,self.index,float32be)
-		self.index+=4
+		self._write(4,'>f',float32be)
 	@property
 	def float32le(self):
 		"""
@@ -468,8 +477,7 @@ class IO(object):
 		return d
 	@float32le.setter
 	def float32le(self,float32le):
-		pack_into('<f',self.data,self.index,float32le)
-		self.index+=4
+		self._write(4,'<f',float32le)
 	@property
 	def float64be(self):
 		"""
@@ -480,8 +488,7 @@ class IO(object):
 		return d
 	@float64be.setter
 	def float64be(self,float64be):
-		pack_into('>d',self.data,self.index,float64be)
-		self.index+=8
+		self._write(8,'>d',float64be)
 	@property
 	def float64le(self):
 		"""
@@ -492,8 +499,7 @@ class IO(object):
 		return d
 	@float64le.setter
 	def float64le(self,float64le):
-		pack_into('<d',self.data,self.index,float64le)
-		self.index+=8
+		self._write(8,'<d',float64le)
 
 	def getBytes(self,nbytes):
 		"""
@@ -520,10 +526,19 @@ class IO(object):
 		:param bytes: can be a string, bytearray, or another IO object
 		"""
 		if isinstance(bytes,IO):
-			bytes=io.data
-		nbytes=len(bytes)
-		d=self.data[self.index].extend(bytes)
-		self.index+=nbytes
+			bytes=bytes.data
+		if type(bytes)==unicode:
+			bytes=bytearray(bytes,encoding="utf-8")
+		if self.index>=len(self.data):
+			# if we're at the end, simply extend the buffer
+			self.data.extend(bytes)
+			self.index+=len(bytes)
+		else:
+			if self.index+len(bytes)>=len(self.data):
+				self.data.extend(bytearray((self.index+len(bytes))-len(self.data)))
+			for b in bytes:
+				self.data[self.index]=b
+				self.index+=1
 
 	def _sz754(self,encoding):
 		"""
@@ -548,7 +563,6 @@ class IO(object):
 			return d.decode('UTF-16',errors='replace')
 		raise Exception()
 	def _sz754set(self,sz754,encoding):
-		pack_into('<d',self.data,self.index,float64le)
 		self.u32=len(sz754)
 		self.setBytes(sz754)
 		self.u8=0

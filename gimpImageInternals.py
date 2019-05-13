@@ -52,8 +52,11 @@ class GimpChannel(GimpIOBase):
 		io.u32=self.width
 		io.u32=self.height
 		io.sz754=self.name
-		io.addBytes(self._propertiesDecode_())
-		io.addBytes(self._pointerEncode_(self._imageHeierarchyPtr))
+		io.addBytes(self._propertiesEncode_())
+		ih=self._imageHeierarchyPtr
+		if ih==None:
+			ih=0
+		io.addBytes(self._pointerEncode_(ih))
 		return io.data
 
 	@property
@@ -92,7 +95,7 @@ class GimpChannel(GimpIOBase):
 		"""
 		if self._imageHeierarchy is None:
 			self._imageHeierarchy=GimpImageHierarchy(self)
-			self._imageHeierarchy._decode_(self._data,self._imageHeierarchyPtr)
+			self._imageHeierarchy.fromBytes(self._data,self._imageHeierarchyPtr)
 		return self._imageHeierarchy
 
 	def __repr__(self,indent=''):

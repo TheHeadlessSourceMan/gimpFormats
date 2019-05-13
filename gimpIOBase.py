@@ -187,6 +187,8 @@ class GimpIOBase(object):
 			return io.u64
 		return io.u32
 	def _pointerEncode_(self,ptr,io=None):
+		if type(ptr) is not int:
+			raise Exception('pointer is wrong type = '+str(type(ptr)))
 		if io is None:
 			io=IO()
 		if self._POINTER_SIZE_==64:
@@ -235,6 +237,15 @@ class GimpIOBase(object):
 			index=p.fromBytes(data,index)
 			self.parasites.append(p)
 		return index
+		
+	def _parasitesEncode_(self):
+		"""
+		encode list of parasites
+		"""
+		io=IO()
+		for parasite in self.parasites:
+			io.addBytes(parasite.toBytes())
+		return io.data
 
 	def _guidelinesDecode_(self,data):
 		"""
@@ -433,7 +444,166 @@ class GimpIOBase(object):
 		
 		If the property is the same as the default, or not specified, returns empty array
 		"""
-		raise NotImplementedError()
+		io=IO(boolSize=32)
+		if propertyType==self.PROP_COLORMAP:
+			if self.colorMap is not None and self.colorMap:
+				io.u32=self.PROP_COLORMAP
+				io.addBytes(self._colormapEncode_())
+		elif propertyType==self.PROP_ACTIVE_LAYER:
+			if self.selected is not None and self.selected:
+				io.u32=self.PROP_ACTIVE_LAYER
+		elif propertyType==self.PROP_ACTIVE_CHANNEL:
+			if self.selected is not None and self.selected:
+				io.u32=self.PROP_ACTIVE_LAYER
+		elif propertyType==self.PROP_SELECTION:
+			if self.isSelection is not None and self.isSelection:
+				io.u32=self.PROP_SELECTION
+		elif propertyType==self.PROP_FLOATING_SELECTION:
+			if self.selectionAttachedTo is not None:
+				io.u32=self.PROP_FLOATING_SELECTION
+				io.u32=self.selectionAttachedTo
+		elif propertyType==self.PROP_OPACITY:
+			if self.opacity is not None and type(self.opacity)!=float:
+				io.u32=self.PROP_OPACITY
+				io.u32=self.opacity
+		elif propertyType==self.PROP_MODE:
+			if self.blendMode is not None:
+				io.u32=self.PROP_MODE
+				io.u32=self.blendMode
+		elif propertyType==self.PROP_VISIBLE:
+			if self.visible is not None and self.visible:
+				io.u32=self.PROP_VISIBLE
+		elif propertyType==self.PROP_LINKED:
+			if self.isLinked is not None and self.isLinked:
+				io.u32=self.PROP_LINKED
+				io.bool=self.isLinked
+		elif propertyType==self.PROP_LOCK_ALPHA:
+			if self.lockAlpha is not None and self.lockAlpha:
+				io.u32=self.PROP_LOCK_ALPHA
+				io.bool=self.lockAlpha
+		elif propertyType==self.PROP_APPLY_MASK:
+			if self.applyMask is not None:
+				io.u32=self.PROP_APPLY_MASK
+				io.bool=self.applyMask
+		elif propertyType==self.PROP_EDIT_MASK:
+			if self.editingMask is not None and self.editingMask:
+				io.u32=self.PROP_EDIT_MASK
+				io.bool=self.editingMask
+		elif propertyType==self.PROP_SHOW_MASK:
+			if self.showMask is not None and self.showMask:
+				io.u32=self.PROP_SHOW_MASK
+				io.bool=self.showMask
+		elif propertyType==self.PROP_SHOW_MASKED:
+			if self.showMasked is not None:
+				io.u32=self.PROP_SHOW_MASKED
+				io.bool=self.showMasked
+		elif propertyType==self.PROP_OFFSETS:
+			if self.xOffset is not None and self.yOffset is not None:
+				io.u32=self.PROP_OFFSETS
+				io.i32=self.xOffset
+				io.i32=self.yOffset
+		elif propertyType==self.PROP_COLOR:
+			if self.color is not None and type(self.color[0])!=float and type(self.color[1])!=float and type(self.color[2])!=float:
+				io.u32=self.PROP_COLOR
+				io.byte=self.color[0]
+				io.byte=self.color[1]
+				io.byte=self.color[2]
+		elif propertyType==self.PROP_COMPRESSION:
+			if self.compression is not None:
+				io.u32=self.PROP_COMPRESSION
+				io.u32=self.compression
+		elif propertyType==self.PROP_GUIDES:
+			if self.guidelines is not None and self.guidelines:
+				io.u32=self.PROP_GUIDES
+				io.addBytes(self._guidelinesEncode_())
+		elif propertyType==self.PROP_RESOLUTION:
+			if self.horizontalResolution is not None and self.verticalResolution is not None:
+				io.u32=self.PROP_RESOLUTION
+				io.u32=self.horizontalResolution
+				io.i32=self.verticalResolution
+		elif propertyType==self.PROP_TATTOO:
+			if self.uniqueId is not None:
+				io.u32=int(self.uniqueId,16)
+		elif propertyType==self.PROP_PARASITES:
+			if self.parasites is not None and self.parasites:
+				io.u32=self.PROP_PARASITES
+				io.addBytes(self._parasitesEncode_())
+		elif propertyType==self.PROP_UNIT:
+			if self.units is not None:
+				io.u32=self.PROP_UNIT
+				io.u32=self.units
+		elif propertyType==self.PROP_PATHS:
+			if self.paths is not None and self.paths:
+				io.u32=self.PROP_PATHS
+				io.u32=len(self.paths)
+				for path in self.paths:
+					io.append(self._pathEncode_(path))
+		elif propertyType==self.PROP_USER_UNIT:
+			if self.userUnits is not None:
+				io.u32=self.PROP_USER_UNIT
+				io.addBytes(self._userUnitsEncode_())
+		elif propertyType==self.PROP_VECTORS:
+			if self.vectors is not None and self.vectors:
+				io.u32=self.PROP_VECTORS
+				io.addBytes(self._vectorsEncode_())
+		elif propertyType==self.PROP_TEXT_LAYER_FLAGS:
+			if self.textLayerFlags is not None:
+				io.u32=self.PROP_TEXT_LAYER_FLAGS
+				io.u32=self.textLayerFlags
+		elif propertyType==self.PROP_OLD_SAMPLE_POINTS:
+			pass
+		elif propertyType==self.PROP_LOCK_CONTENT:
+			if self.locked is not None and self.locked:
+				io.u32=self.PROP_LOCK_CONTENT
+				io.bool=self.locked
+		elif propertyType==self.PROP_GROUP_ITEM:
+			if self.isGroup is not None and self.isGroup:
+				io.u32=self.PROP_GROUP_ITEM
+		elif propertyType==self.PROP_ITEM_PATH:
+			if self.itemPath is not None:
+				io.u32=self.PROP_ITEM_PATH
+				io.addBytes(self._itemPathEncode_())
+		elif propertyType==self.PROP_GROUP_ITEM_FLAGS:
+			if self.groupItemFlags is not None:
+				io.u32=self.PROP_GROUP_ITEM_FLAGS
+				io.u32=self.groupItemFlags
+		elif propertyType==self.PROP_LOCK_POSITION:
+			if self.positionLocked is not None and self.positionLocked:
+				io.u32=self.PROP_LOCK_POSITION
+				io.bool=self.positionLocked
+		elif propertyType==self.PROP_FLOAT_OPACITY:
+			if self.opacity is not None and type(self.opacity)==float:
+				io.u32=self.PROP_FLOAT_OPACITY
+				io.float32=self.opacity
+		elif propertyType==self.PROP_COLOR_TAG:
+			if self.colorTag is not None:
+				io.u32=self.PROP_COLOR_TAG
+				io.u32=self.colorTag
+		elif propertyType==self.PROP_COMPOSITE_MODE:
+			if self.compositeMode is not None:
+				io.u32=self.PROP_COMPOSITE_MODE
+				io.i32=self.compositeMode
+		elif propertyType==self.PROP_COMPOSITE_SPACE:
+			if self.compositeSpace is not None:
+				io.u32=self.PROP_COMPOSITE_SPACE
+				io.i32=self.compositeSpace
+		elif propertyType==self.PROP_BLEND_SPACE:
+			if self.blendSpace is not None:
+				io.u32=self.PROP_BLEND_SPACE
+				io.u32=self.blendSpace
+		elif propertyType==self.PROP_FLOAT_COLOR:
+			if self.color is not None and (type(self.color[0])==float or type(self.color[1])==float or type(self.color[2])==float):
+				io.u32=self.PROP_FLOAT_COLOR
+				io.float32=self.color[0]
+				io.float32=self.color[1]
+				io.float32=self.color[2]
+		elif propertyType==self.PROP_SAMPLE_POINTS:
+			if self.samplePoints is not None and self.samplePoints:
+				io.u32=self.PROP_SAMPLE_POINTS
+				self.addBytes(self._samplePointsEncode_())
+		else:
+			raise Exception('Unknown property id '+str(propertyType))
+		return io.data
 
 	def _propertiesDecode_(self,io):
 		"""
@@ -454,7 +624,7 @@ class GimpIOBase(object):
 		encode a list of properties
 		"""
 		io=IO()
-		for propertyType in self.PROP_NUM_PROPS:
+		for propertyType in range(1,self.PROP_NUM_PROPS):
 			moData=self._propertyEncode_(propertyType)
 			if moData:
 				io.addBytes(moData)

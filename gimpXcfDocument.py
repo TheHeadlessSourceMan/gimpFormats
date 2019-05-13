@@ -77,7 +77,8 @@ class GimpLayer(GimpIOBase):
 		io.addBytes(self._pointerEncode_(dataAreaIndex))
 		dataAreaIO.addBytes(self._propertiesEncode_())
 		io.addBytes(self._pointerEncode_(dataAreaIndex))
-		dataAreaIO.addBytes(self.mask.toBytes())
+		if self.mask is not None:
+			dataAreaIO.addBytes(self.mask.toBytes())
 		io.addBytes(self._pointerEncode_(dataAreaIndex+dataAreaIO.index))
 		io.addBytes(dataAreaIO)
 		return io.data
@@ -301,13 +302,13 @@ class GimpDocument(GimpIOBase):
 		"""
 		io=IO()
 		io.addBytes("gimp xcf ")
-		io.addBytes(str(version)+'\0')
+		io.addBytes(str(self.version)+'\0')
 		io.u32=self.width
 		io.u32=self.height
 		io.u32=self.baseColorMode
 		io.u32=self.precision
 		io.addBytes(self._propertiesEncode_())
-		dataAreaIdx=io.index+self._POINTER_SIZE_*(self.layers+self.channels)
+		dataAreaIdx=io.index+self._POINTER_SIZE_*(len(self.layers)+len(self.channels))
 		dataAreaIo=IO()
 		for layer in self.layers:
 			io.pointer=dataAreaIdx+dataAreaIo.index
@@ -447,6 +448,9 @@ class GimpDocument(GimpIOBase):
 		"""
 		save this gimp image to a file
 		"""
+		self._forceFullyLoaded()
+		if toFilename is None:
+			toFilename=self.filename
 		if not hasattr(toFilename,'write'):
 			f=open(toFilename,'wb')
 		f.write(self.toBytes())
@@ -537,6 +541,11 @@ if __name__ == '__main__':
 							print 'No image for layer',layer
 						else:
 							i.save(filename.replace('*',layer))
+				elif arg[0]=='--save':
+					if len(arg)>1:
+						g.save(arg[1])
+					else:
+						g.save()
 				else:
 					print 'ERR: unknown argument "'+arg[0]+'"'
 			else:
@@ -549,4 +558,5 @@ if __name__ == '__main__':
 		print '   --dump ................ dump info about this file'
 		print '   --showLayer=n ......... show layer(s) (use * for all)'
 		print '   --saveLayer=n,out.jpg . save layer(s) out to file'
+		print '   --save[=file.xcf] ..... save gimp xcf file'
 		print '   --register ............ register this extension'
