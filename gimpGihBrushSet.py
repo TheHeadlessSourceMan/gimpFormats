@@ -103,7 +103,7 @@ class GimpGihBrushSet(object):
 		if self.filename is not None:
 			ret.append('Filename: '+self.filename)
 		ret.append('Name: '+str(self.name))
-		for k,v in self.params.items():
+		for k,v in list(self.params.items()):
 			ret.append(k+': '+str(v))
 		for i in range(len(self.brushes)):
 			ret.append('Brush '+str(i))
@@ -132,7 +132,7 @@ if __name__ == '__main__':
 				if arg[0] in ['-h','--help']:
 					printhelp=True
 				elif arg[0]=='--dump':
-					print g
+					print(g)
 				elif arg[0]=='--show':
 					if arg[1]=='*':
 						for i in range(len(g.brushes)):
@@ -151,15 +151,15 @@ if __name__ == '__main__':
 						fn2=filename.replace('*',i)
 						g.brushes[int(index)].image.save(fn2)
 				else:
-					print 'ERR: unknown argument "'+arg[0]+'"'
+					print('ERR: unknown argument "'+arg[0]+'"')
 			else:
 				g=GimpGihBrushSet(arg)
 	if printhelp:
-		print 'Usage:'
-		print '  gimpGihBrushSet.py file.xcf [options]'
-		print 'Options:'
-		print '   -h, --help ............ this help screen'
-		print '   --dump ................ dump info about this file'
-		print '   --show=n .............. show the brush image(s) n=* for all'
-		print '   --save=n,out.jpg ...... save out the brush image(s)'
-		print '   --register ............ register this extension'
+		print('Usage:')
+		print('  gimpGihBrushSet.py file.xcf [options]')
+		print('Options:')
+		print('   -h, --help ............ this help screen')
+		print('   --dump ................ dump info about this file')
+		print('   --show=n .............. show the brush image(s) n=* for all')
+		print('   --save=n,out.jpg ...... save out the brush image(s)')
+		print('   --register ............ register this extension')

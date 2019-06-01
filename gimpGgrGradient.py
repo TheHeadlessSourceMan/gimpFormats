@@ -207,15 +207,15 @@ if __name__ == '__main__':
 				if arg[0] in ['-h','--help']:
 					printhelp=True
 				elif arg[0]=='--dump':
-					print g
+					print(g)
 				else:
-					print 'ERR: unknown argument "'+arg[0]+'"'
+					print('ERR: unknown argument "'+arg[0]+'"')
 			else:
 				g=GimpGgrGradient(arg)
 	if printhelp:
-		print 'Usage:'
-		print '  gimpGgrGradient.py file.xcf [options]'
-		print 'Options:'
-		print '   -h, --help ............ this help screen'
-		print '   --dump ................ dump info about this file'
-		print '   --register ............ register this extension'
+		print('Usage:')
+		print('  gimpGgrGradient.py file.xcf [options]')
+		print('Options:')
+		print('   -h, --help ............ this help screen')
+		print('   --dump ................ dump info about this file')
+		print('   --register ............ register this extension')

@@ -237,7 +237,7 @@ class GimpIOBase(object):
 			index=p.fromBytes(data,index)
 			self.parasites.append(p)
 		return index
-		
+
 	def _parasitesEncode_(self):
 		"""
 		encode list of parasites
@@ -304,19 +304,28 @@ class GimpIOBase(object):
 		else:
 			self.groupItemFlags&=(~0x00000001)
 
-	def _colormapDecode_(self,data):
+	def _colormapDecode_(self,data,index=None):
 		"""
+		:param data: can be bytes or an IO object
+
 		decode colormap/palette
 		"""
+		ioObj=None
+		if isinstance(data,IO):
+			ioObj=data
+			index=data.index
+			data=data.data
 		_=struct.unpack('>I',data[0:4])[0] # number of colors
-		index=4
+		index+=4
 		colors=[]
 		while index<len(data):
-			r=struct.unpack('>B',data[index])[0]; index+=1
-			g=struct.unpack('>B',data[index])[0]; index+=1
-			b=struct.unpack('>B',data[index])[0]; index+=1
+			r=data[index]; index+=1
+			g=data[index]; index+=1
+			b=data[index]; index+=1
 			colors.append((r,g,b))
 		self.colorMap=colors
+		if ioObj is not None:
+			ioObj.index=index
 
 	def _userUnitsDecode_(self,data):
 		"""
@@ -343,7 +352,7 @@ class GimpIOBase(object):
 		decode a single property
 		"""
 		io=IO(data,boolSize=32)
-		#print 'DECODING PROPERTY',propertyType,len(data)
+		#print('DECODING PROPERTY',propertyType,len(data))
 		if propertyType==self.PROP_COLORMAP:
 			self._colormapDecode_(io)
 		elif propertyType==self.PROP_ACTIVE_LAYER:
@@ -388,7 +397,7 @@ class GimpIOBase(object):
 			self.horizontalResolution=io.float32
 			self.verticalResolution=io.float32
 		elif propertyType==self.PROP_TATTOO:
-			self.uniqueId=data.encode('hex')
+			self.uniqueId=data.hex()
 		elif propertyType==self.PROP_PARASITES:
 			self._parasitesDecode_(data)
 		elif propertyType==self.PROP_UNIT:
@@ -437,11 +446,11 @@ class GimpIOBase(object):
 		else:
 			raise Exception('Unknown property id '+str(propertyType))
 		return io.index
-		
+
 	def _propertyEncode_(self,propertyType):
 		"""
 		encode a single property
-		
+
 		If the property is the same as the default, or not specified, returns empty array
 		"""
 		io=IO(boolSize=32)
@@ -719,8 +728,8 @@ class GimpIOBase(object):
 				color=self.colorMap[i]
 				ret.append(i+': ('+str(color[0])+','+str(color[1])+','+str(color[2])+')')
 		return indent+(('\n'+indent).join(ret))
-		
-		
+
+
 class GimpUserUnits(object):
 	"""
 	user-defined measurement units
@@ -751,7 +760,7 @@ class GimpUserUnits(object):
 		self.sname=io.sz754
 		self.pname=io.sz754
 		return io.index
-		
+
 	def toBytes(self):
 		"""
 		convert this object to raw bytes

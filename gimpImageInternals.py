@@ -27,7 +27,7 @@ class GimpChannel(GimpIOBase):
 		if image is not None: # this is last because image can reset values
 			self.image=image
 
-  	def fromBytes(self,data,index=0):
+	def fromBytes(self,data,index=0):
 		"""
 		decode a byte buffer
 
@@ -72,11 +72,11 @@ class GimpChannel(GimpIOBase):
 		"""
 		self.width=image.width
 		self.height=image.height
-		if not self.name and isinstance(image,basestring):
+		if not self.name and isinstance(image,str):
 			# try to use a filename as the name
 			self.name=image.rsplit('\\',1)[-1].rsplit('/',1)[-1]
 		self._imageHierarchy=GimpImageHierarchy(self,image)
-		
+
 	def _forceFullyLoaded(self):
 		"""
 		make sure everything is fully loaded from the file
@@ -154,7 +154,7 @@ class GimpImageHierarchy(GimpIOBase):
 			self._levelPtrs=[self._levelPtrs[0]]
 		self._data=data
 		return io.index
-		
+
 	def toBytes(self):
 		"""
 		encode this object to a byte buffer
@@ -231,7 +231,7 @@ class GimpImageLevel(GimpIOBase):
 		self.height=0
 		self._tiles=None # tile PIL images
 		self._image=None
-		
+
 	def fromBytes(self,data,index=0):
 		"""
 		decode a byte buffer
@@ -263,11 +263,11 @@ class GimpImageLevel(GimpIOBase):
 					data=zlib.decompress(io.data[ptr:ptr+totalBytes+24]) # guess how many bytes are needed
 				else:
 					raise Exception('ERR: unsupported compression mode '+str(self.doc.compression))
-				subImage=PIL.Image.frombytes(self.mode,size,str(data),decoder_name='raw')
+				subImage=PIL.Image.frombytes(self.mode,size,bytes(data),decoder_name='raw')
 				self._tiles.append(subImage)
 		_=self._pointerDecode_(io) # list ends with nul character
 		return io.index
-		
+
 	def toBytes(self):
 		"""
 		encode this object to a byte buffer
@@ -301,36 +301,36 @@ class GimpImageLevel(GimpIOBase):
 		for chan in range(bpp):
 			n=0
 			while n<pixels:
-				opcode=ord(data[index]); index+=1
+				opcode=data[index]; index+=1
 				if opcode>=0 and opcode<=126: # a short run of identical bytes
-					val=ord(data[index]); index+=1
+					val=data[index]; index+=1
 					for _ in range(opcode+1):
 						ret[chan].append(val)
 						n+=1
 				elif opcode==127: # A long run of identical bytes
-					m=ord(data[index]); index+=1
-					b=ord(data[index]); index+=1
-					val=ord(data[index]); index+=1
+					m=data[index]; index+=1
+					b=data[index]; index+=1
+					val=data[index]; index+=1
 					amt=m*256+b
 					for _ in range(amt):
 						ret[chan].append(val)
 						n+=1
 				elif opcode==128: # A long run of different bytes
-					m=ord(data[index]); index+=1
-					b=ord(data[index]); index+=1
+					m=data[index]; index+=1
+					b=data[index]; index+=1
 					amt=m*256+b
 					for _ in range(amt):
-						val=ord(data[index]); index+=1
+						val=data[index]; index+=1
 						ret[chan].append(val)
 						n+=1
 				elif opcode>=129 and opcode<=255: # a short run of different bytes
 					amt=256-opcode
 					for _ in range(amt):
-						val=ord(data[index]); index+=1
+						val=data[index]; index+=1
 						ret[chan].append(val)
 						n+=1
 				else:
-					print 'Unreachable branch',opcode
+					print('Unreachable branch',opcode)
 					raise Exception()
 		# flatten/weave the individual channels into one strream
 		flat=bytearray()
@@ -338,7 +338,7 @@ class GimpImageLevel(GimpIOBase):
 			for chan in range(bpp):
 				flat.append(ret[chan][i])
 		return flat
-		
+
 	def _encodeRLE(self,data,bpp):
 		"""
 		encode image to RLE  image data
@@ -414,16 +414,16 @@ class GimpImageLevel(GimpIOBase):
 			dataByChannel[index]=rleEncodeChan(dataByChannel[index])
 		# join and return
 		return ''.join(dataByChannel)
-	
+
 	@property
 	def bpp(self):
 		return self.parent.bpp
-		
+
 	@property
 	def mode(self):
 		MODES=[None,'L','LA','RGB','RGBA']
 		return MODES[self.bpp]
-		
+
 	@property
 	def tiles(self):
 		if self._tiles is not None:

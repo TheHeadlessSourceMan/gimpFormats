@@ -13,20 +13,19 @@ Currently not supporting:
 	Programatically alter documents (add layer, etc)
 	Rendering a final, compositied image
 """
-import struct
-import zlib
-import PIL.Image
 from binaryIO import *
 from gimpIOBase import *
 from gimpImageInternals import *
-	
+
 
 class GimpLayer(GimpIOBase):
 	"""
 	Represents a single layer in a gimp image
 	"""
 
-	COLOR_MODES=['RGB color without alpha','RGB color with alpha','Grayscale without alpha','Grayscale with alpha','Indexed without alpha','Indexed with alpha']
+	COLOR_MODES=['RGB color without alpha','RGB color with alpha',
+		'Grayscale without alpha','Grayscale with alpha',
+		'Indexed without alpha','Indexed with alpha']
 	PIL_MODE_TO_LAYER_MODE={'L':2,'LA':3,'RGB':0,'RGBA':1}
 
 	def __init__(self,parent,name=None,image=None):
@@ -61,8 +60,8 @@ class GimpLayer(GimpIOBase):
 		self._maskPtr=self._pointerDecode_(io)
 		self._mask=None
 		self._data=data
-		return io.index	
-		
+		return io.index
+
 	def toBytes(self):
 		"""
 		encode to byte array
@@ -107,15 +106,15 @@ class GimpLayer(GimpIOBase):
 	def image(self,image):
 		"""
 		set the layer image
-		
+
 		NOTE: resets layer width, height, and colorMode
 		"""
 		self.height=image.height
 		self.width=image.width
-		if not self.PIL_MODE_TO_LAYER_MODE.has_key(image.mode):
+		if image.mode not in self.PIL_MODE_TO_LAYER_MODE:
 			raise NotImplementedError('No way of handlng PIL image mode "'+image.mode+'"')
 		self.colorMode=self.PIL_MODE_TO_LAYER_MODE[image.mode]
-		if not self.name and isinstance(image,basestring):
+		if not self.name and isinstance(image,str):
 			# try to use a filename as the name
 			self.name=image.rsplit('\\',1)[-1].rsplit('/',1)[-1]
 		self.imageHierarchy=GimpImageHierarchy(self)
@@ -128,14 +127,14 @@ class GimpLayer(GimpIOBase):
 
 		This is mainly needed for deciphering image, and therefore,
 		of little use to you, the user.
-		
+
 		NOTE: can return None if it has been fully read into an image
 		"""
 		if self._imageHeierarchy is None and self._imageHeierarchyPtr>0:
 			self._imageHeierarchy=GimpImageHierarchy(self)
 			self._imageHeierarchy.fromBytes(self._data,self._imageHeierarchyPtr)
 		return self._imageHeierarchy
-		
+
 	def _forceFullyLoaded(self):
 		"""
 		make sure everything is fully loaded from the file
@@ -162,6 +161,92 @@ class GimpLayer(GimpIOBase):
 		return indent+(('\n'+indent).join(ret))
 
 
+class Precision:
+	"""
+	Since the precision code is so unusual, I decided to create a class
+	to parse it.
+	"""
+
+	def __init__(self):
+		self.bits=8
+		self.gamma=True
+		self.numberFormat=int
+
+	def decode(self,gimpVersion,io):
+		"""
+		decode the precision code from the file
+		"""
+		if gimpVersion<4:
+			self.bits=8
+			self.gamma=True
+			self.numberFormat=int
+		else:
+			code=io.u32
+			if gimpVersion==4:
+				self.gamma=(True,True,False,False,False)[code]
+				self.bits=(8,16,32,16,32)[code]
+				self.numberFormat=(int,int,int,float,float)[code]
+			elif gimpVersion in (5,6):
+				self.gamma=(code%100!=0)
+				code=int(code/100)
+				self.bits=(8,16,32,16,32)[code]
+				self.numberFormat=(int,int,int,float,float)[code]
+			else: # gimpVersion 7 or above
+				self.gamma=(code%100!=0)
+				code=int(code/100)
+				self.bits=(8,16,32,16,32,64)[code]
+				self.numberFormat=(int,int,int,float,float,float)[code]
+
+	def encode(self,gimpVersion,io):
+		"""
+		encode this to the file
+
+		NOTE: will not mess with development versions 5 or 6
+		"""
+		if gimpVersion<4:
+			if self.bits!=8 or not(self.gamma) or self.numberFormat!=int:
+				raise Exception('Illegal precision ('+str(self)+') for gimp version '+str(gimpVersion))
+		else:
+			if gimpVersion==4:
+				if self.bits==64:
+					raise Exception('Illegal precision ('+str(self)+') for gimp version '+str(gimpVersion))
+				if self.numberFormat==int:
+					code=(8,16,32).index(self.bits)
+				else:
+					code=(16,32).index(self.bits)+2
+				code=code*100
+				if self.gamma:
+					code+=50
+			elif gimpVersion in (5,6):
+				raise NotImplementedError('Cannot save to gimp developer version '+str(gimpVersion))
+			else: # version 7 or above
+				if self.numberFormat==int:
+					code=(8,16,32).index(self.bits)
+				else:
+					code=(16,32,64).index(self.bits)+2
+				code=code*100
+				if self.gamma:
+					code+=50
+			io.u32=code
+
+	def requiredGimpVersion(self):
+		"""
+		return the lowest gimp version that supports this precision
+		"""
+		if self.bits==8 and self.gamma and self.numberFormat==int:
+			return 0
+		if self.bits==64:
+			return 7
+		return 4
+
+	def __repr__(self):
+		ret=[]
+		ret.append(str(self.bits)+"-bit")
+		ret.append('gamma' if self.gamma else 'linear')
+		ret.append('integer' if self.numberFormat is int else float)
+		return ' '.join(ret)
+
+
 class GimpDocument(GimpIOBase):
 	"""
 	Pure python implementation of the gimp file format
@@ -170,62 +255,10 @@ class GimpDocument(GimpIOBase):
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/xcf.txt
 	"""
 
-	PRECISION_CODE={
-		100:'8-bit linear integer',
-		150:'8-bit gamma integer',
-		200:'16-bit linear integer',
-		250:'16-bit gamma integer',
-		300:'32-bit linear integer',
-		350:'32-bit gamma integer',
-		500:'16-bit linear floating point',
-		550:'16-bit gamma floating point',
-		600:'32-bit linear floating point',
-		650:'32-bit gamma floating point',
-		700:'64-bit linear floating point',
-		750:'64-bit gamma floating point',
-		0:'8-bit gamma integer',
-		1:'16-bit gamma integer',
-		2:'32-bit linear integer',
-		3:'16-bit linear floating point',
-		4:'32-bit linear floating point',
-	}
-	PRECISION_CODE_GAMMA={ # whether gamma should be applied to a given precision code
-		100:False,150:True,200:False,250:True,300:False,350:True,500:False,550:True,
-		600:False,650:True,700:False,750:True,0:True,1:True,2:False,3:False,4:False}
-	PRECISION_CODE_BITS={ # number of bits for any given precision code
-		100:8,150:8,200:16,250:16,300:32,350:32,500:16,550:16,600:32,650:32,700:64,750:64,0:8,1:16,2:32,3:16,4:32}
-	PRECISION_CODE_DATATYPE={ # python data type for precision code (int or float)
-		100:int,150:int,200:int,250:int,300:int,350:int,500:float,550:float,
-		600:float,650:float,700:float,750:float,0:int,1:int,2:int,3:float,4:float}
-	
-	@classmethod
-	def findPrecisionCode(clazz,pythonType,bits,gamma=False):
-		"""
-		find the proper precision code that fits the parameters
-		
-		:param pythonType: float or int
-		:param bits: number of bits (8,16,32, or 64)
-		:param gamma: whether to use gamma (default=False)
-		
-		:return: precision code -- if parameters are not illegal, this should always return
-			if they are, you'll get a big fat array index out of bounds exception.
-		"""
-		valid=[100,150,200,250,300,350,500,550,600,650,700,750]
-		for k,v in PRECISION_CODE_BITS.items():
-			if k>=100 and v!=bits:
-				valid.remove(k)
-		for k,v in PRECISION_CODE_DATATYPE.items():
-			if k>=100 and v!=pythonType:
-				valid.remove(k)
-		for k,v in PRECISION_CODE_GAMMA.items():
-			if k>=100 and v!=gamma:
-				valid.remove(k)
-		return valid[0]
-
 	def __init__(self,filename):
 		GimpIOBase.__init__(self,self)
 		self.dirty=False # a file-changed indicator.  # TODO: Not fully implemented.
-		self._layers =None
+		self._layers=None
 		self._layerPtr=[]
 		self.channels=[]
 		self._channelPtr=[]
@@ -233,7 +266,8 @@ class GimpDocument(GimpIOBase):
 		self.width=0
 		self.height=0
 		self.baseColorMode=0
-		self.precision=0 # one of self.PRECISION_CODE
+		self.precision=None # Precision object
+		self._data=None
 		if filename is not None:
 			self.load(filename)
 
@@ -261,18 +295,18 @@ class GimpDocument(GimpIOBase):
 		:param index: index within the buffer to start at
 		"""
 		io=IO(data,index)
-		if io.getBytes(9)!="gimp xcf ":
+		if io.getBytes(9)!="gimp xcf ".encode('ascii'):
 			raise Exception('Not a valid GIMP file')
 		version=io.cString
 		if version=='file':
 			self.version=0
 		else:
 			self.version=int(version[1:])
-		#print 'Gimp version',self.version,self._POINTER_SIZE_
 		self.width=io.u32
 		self.height=io.u32
 		self.baseColorMode=io.u32
-		self.precision=io.u32
+		self.precision=Precision()
+		self.precision.decode(self.version,io)
 		self._propertiesDecode_(io)
 		self._layerPtr=[]
 		self._layers=[]
@@ -292,10 +326,10 @@ class GimpDocument(GimpIOBase):
 				break
 			self._channelPtr.append(ptr)
 			c=GimpChannel(self)
-			c._decode_(io.data,ptr)
+			c.fromBytes(io.data,ptr)
 			self.channels.append(c)
 		return io.index
-		
+
 	def toBytes(self):
 		"""
 		encode to a byte array
@@ -306,7 +340,9 @@ class GimpDocument(GimpIOBase):
 		io.u32=self.width
 		io.u32=self.height
 		io.u32=self.baseColorMode
-		io.u32=self.precision
+		if self.precision is None:
+			self.precision=Precision()
+		self.precision.encode(self.version,io)
 		io.addBytes(self._propertiesEncode_())
 		dataAreaIdx=io.index+self._POINTER_SIZE_*(len(self.layers)+len(self.channels))
 		dataAreaIo=IO()
@@ -335,24 +371,24 @@ class GimpDocument(GimpIOBase):
 	def layers(self):
 		"""
 		Decode the image's layers if necessary
-		
+
 		TODO: need to do the same thing with self.Channels
 		"""
 		if self._layers is None:
 			self._layers=[]
 			for ptr in self._layerPtr:
 				l=GimpLayer(self)
-				l.fromBytes(self.data,ptr)
+				l.fromBytes(self._data,ptr)
 				self._layers.append(l)
 			# add a reference back to this object so it doesn't go away while array is in use
-			self._layers_.parent=self
+			self._layers.parent=self
 			# override some internal methods so we can do more with them
 			self._layers._actualDelitem_=self._layers.__delitem__
 			self._layers.__delitem__=self.deleteLayer
 			self._layers._actualSetitem_=self._layers.__delitem__
 			self._layers.__setitem__=self.setLayer
 		return self._layers
-			
+
 	def getLayer(self,index):
 		"""
 		return a given layer
@@ -365,12 +401,12 @@ class GimpDocument(GimpIOBase):
 		self._forceFullyLoaded()
 		self.dirty=True
 		self._layerPtr=None # no longer try to use the pointers to get data
-		layers._actualSetitem_(index,layer)
-		
+		self.layers._actualSetitem(index,layer)
+
 	def newLayer(self,name,image,index=-1):
 		"""
 		create a new layer based on a PIL image
-		
+
 		:param name: a name for the new layer
 		:param index: where to insert the new layer (default=top)
 		:return: newly created GimpLayer object
@@ -378,46 +414,46 @@ class GimpDocument(GimpIOBase):
 		layer=GimpLayer(self,name,image)
 		self.insertLayer(layer,index)
 		return layer
-		
+
 	def newLayerFromClipboard(self,name='pasted',index=-1):
 		"""
 		Create a new image from the system clipboard.
-		
+
 		:param name: a name for the new layer (default="pasted")
 		:param index: where to insert the new layer (default=top)
 		:return: newly created GimpLayer object
-		
+
 		NOTE: requires pillow PIL implementation
 		NOTE: only works on OSX and Windows
 		"""
 		import PIL.ImageGrab
 		image=PIL.ImageGrab.grabclipboard()
 		return self.newLayer(name,image,index)
-	
+
 	def addLayer(self,layer):
 		"""
 		append a layer object to the document
-		
+
 		:param layer: the new layer to append
 		"""
 		self.insertLayer(layer,-1)
 	def appendLayer(self,layer):
 		"""
 		append a layer object to the document
-		
+
 		:param layer: the new layer to append
 		"""
 		self.insertLayer(layer,-1)
-		
+
 	def insertLayer(self,layer,index=-1):
 		"""
 		insert a layer object at a specific position
-		
+
 		:param layer: the new layer to insert
 		:param index: where to insert the new layer (default=top)
 		"""
 		self.layers.insert(index,layer)
-		
+
 	def deleteLayer(self,index):
 		"""
 		delete a layer
@@ -466,7 +502,7 @@ class GimpDocument(GimpIOBase):
 		ret.append('Version: '+str(self.version))
 		ret.append('Size: '+str(self.width)+' x '+str(self.height))
 		ret.append('Base Color Mode: '+self.COLOR_MODES[self.baseColorMode])
-		ret.append('Precision: '+self.PRECISION_CODE[self.precision])
+		ret.append('Precision: '+str(self.precision))
 		ret.append(GimpIOBase.__repr__(self))
 		if self._layerPtr:
 			ret.append('Layers: ')
@@ -500,22 +536,22 @@ if __name__ == '__main__':
 				if arg[0] in ['-h','--help']:
 					printhelp=True
 				elif arg[0]=='--dump':
-					print g
+					print(g)
 				elif arg[0]=='--showLayer':
 					if arg[1]=='*':
 						for n in range(len(g.layers)):
 							i=g.layers[n].image
 							if i is None:
-								print 'No image for layer',n
+								print('No image for layer',n)
 							else:
-								print 'showing layer',n
+								print('showing layer',n)
 								i.show()
 					else:
 						i=g.layers[int(arg[1])].image
 						if i is None:
-							print 'No image for layer',int(arg[1])
+							print('No image for layer',int(arg[1]))
 						else:
-							print 'showing layer',arg[1]
+							print('showing layer',arg[1])
 							i.show()
 				elif arg[0]=='--saveLayer':
 					layer=arg[1].split(',',1)
@@ -530,15 +566,15 @@ if __name__ == '__main__':
 						for n in range(len(g.layers)):
 							i=g.layers[n].image
 							if i is None:
-								print 'No image for layer',n
+								print('No image for layer',n)
 							else:
 								fn2=filename.replace('*',str(n))
-								print 'saving layer',fn2
+								print('saving layer',fn2)
 								i.save(fn2)
 					else:
 						i=g.layers[int(layer)].image
 						if i is None:
-							print 'No image for layer',layer
+							print('No image for layer',layer)
 						else:
 							i.save(filename.replace('*',layer))
 				elif arg[0]=='--save':
@@ -547,16 +583,16 @@ if __name__ == '__main__':
 					else:
 						g.save()
 				else:
-					print 'ERR: unknown argument "'+arg[0]+'"'
+					print('ERR: unknown argument "'+arg[0]+'"')
 			else:
 				g=GimpDocument(arg)
 	if printhelp:
-		print 'Usage:'
-		print '  gimpXcfDocument.py file.xcf [options]'
-		print 'Options:'
-		print '   -h, --help ............ this help screen'
-		print '   --dump ................ dump info about this file'
-		print '   --showLayer=n ......... show layer(s) (use * for all)'
-		print '   --saveLayer=n,out.jpg . save layer(s) out to file'
-		print '   --save[=file.xcf] ..... save gimp xcf file'
-		print '   --register ............ register this extension'
+		print('Usage:')
+		print('  gimpXcfDocument.py file.xcf [options]')
+		print('Options:')
+		print('   -h, --help ............ this help screen')
+		print('   --dump ................ dump info about this file')
+		print('   --showLayer=n ......... show layer(s) (use * for all)')
+		print('   --saveLayer=n,out.jpg . save layer(s) out to file')
+		print('   --save[=file.xcf] ..... save gimp xcf file')
+		print('   --register ............ register this extension')

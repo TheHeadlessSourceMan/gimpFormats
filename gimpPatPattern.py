@@ -153,21 +153,21 @@ if __name__ == '__main__':
 				if arg[0] in ['-h','--help']:
 					printhelp=True
 				elif arg[0]=='--dump':
-					print g
+					print(g)
 				elif arg[0]=='--show':
 					g.image.show()
 				elif arg[0]=='--save':
 					g.image.save(arg[1])
 				else:
-					print 'ERR: unknown argument "'+arg[0]+'"'
+					print('ERR: unknown argument "'+arg[0]+'"')
 			else:
 				g=GimpPatPattern(arg)
 	if printhelp:
-		print 'Usage:'
-		print '  gimpPatPattern.py file.xcf [options]'
-		print 'Options:'
-		print '   -h, --help ............ this help screen'
-		print '   --dump ................ dump info about this file'
-		print '   --show ................ show the pattern image'
-		print '   --save=out.jpg ........ save out the pattern image'
-		print '   --register ............ register this extension'
+		print('Usage:')
+		print('  gimpPatPattern.py file.xcf [options]')
+		print('Options:')
+		print('   -h, --help ............ this help screen')
+		print('   --dump ................ dump info about this file')
+		print('   --show ................ show the pattern image')
+		print('   --save=out.jpg ........ save out the pattern image')
+		print('   --register ............ register this extension')

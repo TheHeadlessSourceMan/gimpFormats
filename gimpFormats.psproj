@@ -1,5 +1,5 @@
 ﻿[PyScripter]
-Version=3.4.2.0
+Version=3.6.0.0
 
 [Project]
 ClassName=TProjectRootNode
@@ -19,26 +19,62 @@ FileName=$[Project-Path]gimpFormat.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node2]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpImageInternals.py
+FileName=$[Project-Path]gimpGbrBrush.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node3]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpIOBase.py
+FileName=$[Project-Path]gimpGgrGradient.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node4]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpParasites.py
+FileName=$[Project-Path]gimpGihBrushSet.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node5]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpVectors.py
+FileName=$[Project-Path]gimpGpbBrush.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node6]
 ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpGtpToolPreset.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node7]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpImageInternals.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node8]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpIOBase.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node9]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpParasites.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node10]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpPatPattern.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node11]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpVbrBrush.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node12]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]gimpVectors.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node13]
+ClassName=TProjectFileNode
 FileName=$[Project-Path]gimpXcfDocument.py
 
+[Project\ChildNodes\Node0\ChildNodes\Node14]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]setup.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node15]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]__init__.py
+
 [Project\ChildNodes\Node0\ChildNodes]
-Count=7
+Count=16
 
 [Project\ChildNodes\Node1]
 ClassName=TProjectRunConfiguationsNode
