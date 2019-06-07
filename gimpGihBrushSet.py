@@ -3,27 +3,25 @@
 """
 Gimp Image Pipe Format
 
-The gih format is use to store a series of brushes, and some extra info 
-for how to use them. 
+The gih format is use to store a series of brushes, and some extra info
+for how to use them.
 """
-import struct
-import PIL.Image
-from binaryIO import *
-from gimpGbrBrush import *
-	
+from .binaryIO import *
+from .gimpGbrBrush import *
 
-class GimpGihBrushSet(object):
+
+class GimpGihBrushSet:
 	"""
 	Gimp Image Pipe Format
 
-	The gih format is use to store a series of brushes, and some extra info 
-	for how to use them. 
+	The gih format is use to store a series of brushes, and some extra info
+	for how to use them.
 
 	See:
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/gih.txt
 	"""
 
-	def __init__(self,filename):
+	def __init__(self,filename=None):
 		self.filename=None
 		self.name=''
 		self.params={}
@@ -59,17 +57,17 @@ class GimpGihBrushSet(object):
 		secondLine=io.textLine.split(' ')
 		self.params={}
 		numBrushes=int(secondLine[0])
-		# everything that's left is a gimp-image-pipe-parameters parasite 
-		for i in range(1,len(secondLine)): 
+		# everything that's left is a gimp-image-pipe-parameters parasite
+		for i in range(1,len(secondLine)):
 			param=secondLine[i].split(':',1)
 			self.params[param[0].strip()]=param[1].strip()
 		self.brushes=[]
-		for i in numBrushes:
+		for _ in range(numBrushes):
 			b=GimpGbrBrush()
-			io.index=b._decode_(io.data,io.index)
+			io.index=b._decode_(io.data,io.index) # TODO: broken.  For some reson there is extra data between brushes!
 			self.brushes.append(b)
 		return io.index
-		
+
 	def toBytes(self):
 		"""
 		encode this object to a byte array
@@ -94,7 +92,7 @@ class GimpGihBrushSet(object):
 		if not hasattr(toFilename,'write'):
 			f=open(toFilename,'wb')
 		f.write(self.toBytes())
-		
+
 	def __repr__(self,indent=''):
 		"""
 		Get a textual representation of this object

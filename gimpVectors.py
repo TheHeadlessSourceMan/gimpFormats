@@ -3,8 +3,8 @@
 """
 Stuff related to vectors/paths within a gimp document
 """
-from gimpIoBase import GimpIOBase
-from binaryIO import *
+from .gimpIOBase import GimpIOBase
+from .binaryIO import *
 
 
 class GimpVector(GimpIOBase):

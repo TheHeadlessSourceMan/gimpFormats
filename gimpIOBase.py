@@ -4,8 +4,8 @@
 A specialized binary file base for Gimp files
 """
 import struct
-from binaryIO import *
-from gimpParasites import *
+from .binaryIO import *
+from .gimpParasites import *
 
 
 class GimpIOBase(object):

@@ -5,9 +5,9 @@ Pure python implementation of the OLD gimp gpb brush format
 """
 import struct
 import PIL.Image
-from binaryIO import *
-from gimpGbrBrush import *
-from gimpPatPattern import *
+from .binaryIO import *
+from .gimpGbrBrush import *
+from .gimpPatPattern import *
 	
 
 class GimpGpbBrush(object):

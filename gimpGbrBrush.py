@@ -5,8 +5,8 @@ Pure python implementation of the gimp gbr brush format
 """
 import struct
 import PIL.Image
-from binaryIO import *
-	
+from .binaryIO import *
+
 
 class GimpGbrBrush(object):
 	"""
@@ -15,7 +15,7 @@ class GimpGbrBrush(object):
 	See:
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/gbr.txt
 	"""
-	
+
 	COLOR_MODES=[None,'L','LA','RGB','RGBA'] # only L or RGB allowed
 
 	def __init__(self,filename=None):
@@ -64,14 +64,15 @@ class GimpGbrBrush(object):
 		self.bpp=io.u32 # only allows grayscale or RGB
 		self.mode=self.COLOR_MODES[self.bpp]
 		magic=io.getBytes(4)
-		if magic!='GIMP':
+		if magic.decode('ascii')!='GIMP':
+			raise Exception('"'+magic.decode('ascii')+'" '+str(index))
 			raise Exception('File format error.  Magic value mismatch.')
 		self.spacing=io.u32
 		nameLen=headerSize-io.index
 		self.name=io.getBytes(nameLen).decode('UTF-8')
 		self.rawImage=io.getBytes(self.width*self.height*self.bpp)
 		return io.index
-			
+
 	def toBytes(self):
 		"""
 		encode this object to byte array
@@ -105,9 +106,22 @@ class GimpGbrBrush(object):
 		"""
 		save this gimp image to a file
 		"""
-		if not hasattr(toFilename,'write'):
-			f=open(toFilename,'wb')
-		f.write(self.toBytes())
+		asImage=False
+		if toExtension is None:
+			if toFilename is not None:
+				toExtension=toFilename.rsplit('.',1)
+				if len(toExtension)>1:
+					toExtension=toExtension[-1]
+				else:
+					toExtension=None
+		if toExtension is not None and toExtension!='gbr':
+			asImage=True
+		if asImage:
+			self.image.save(toFilename)
+		else:
+			if not hasattr(toFilename,'write'):
+				f=open(toFilename,'wb')
+			f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""

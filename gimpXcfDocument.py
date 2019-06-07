@@ -13,9 +13,9 @@ Currently not supporting:
 	Programatically alter documents (add layer, etc)
 	Rendering a final, compositied image
 """
-from binaryIO import *
-from gimpIOBase import *
-from gimpImageInternals import *
+from .binaryIO import *
+from .gimpIOBase import *
+from .gimpImageInternals import *
 
 
 class GimpLayer(GimpIOBase):
@@ -255,7 +255,7 @@ class GimpDocument(GimpIOBase):
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/xcf.txt
 	"""
 
-	def __init__(self,filename):
+	def __init__(self,filename=None):
 		GimpIOBase.__init__(self,self)
 		self.dirty=False # a file-changed indicator.  # TODO: Not fully implemented.
 		self._layers=None

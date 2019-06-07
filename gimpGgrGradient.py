@@ -3,19 +3,21 @@
 """
 Gimp color gradient
 """
-import struct
-import PIL.Image
-from binaryIO import *
-	
-	
-class GradientSegment(object):
+from .binaryIO import *
+
+
+class GradientSegment:
 	"""
 	Single segment within a gradient
 	"""
-	
-	BLEND_FUNCTIONS=["linear","curved","sinusoidal","spherical (increasing)","spherical (decreasing)","step"]
+
+	BLEND_FUNCTIONS=[
+		"linear","curved","sinusoidal","spherical (increasing)",
+		"spherical (decreasing)","step"]
 	COLOR_TYPES=["RGB","HSV CCW","HSV CW"]
-	ENDPOINT_COLOR_TYPES=["fixed","foreground","foreground transparent","background","background transparent"]
+	ENDPOINT_COLOR_TYPES=[
+		"fixed","foreground","foreground transparent",
+		"background","background transparent"]
 
 	def __init__(self):
 		self.leftPosition=0
@@ -23,18 +25,18 @@ class GradientSegment(object):
 		self.rightPosition=1.0
 		self.leftColor=(0,0,0,0)
 		self.rightColor=(255,255,255,0)
-		self.blendFunc=0 # one of self.BLEND_FUNCTIONS
-		self.colorType=0 # one of self.COLOR_TYPES
-		self.leftColorType=0 # one of self.ENDPOINT_COLOR_TYPES
-		self.rightColorType=0 # one of self.ENDPOINT_COLOR_TYPES
-		
+		self.blendFunc=None # one of self.BLEND_FUNCTIONS
+		self.colorType=None # one of self.COLOR_TYPES
+		self.leftColorType=None # one of self.ENDPOINT_COLOR_TYPES
+		self.rightColorType=None # one of self.ENDPOINT_COLOR_TYPES
+
 	def getColor(self,percent):
 		"""
 		given a decimal percent (1.0 = 100%) retrieve
 		the appropriate color for this point in the gradient
 		"""
 		raise NotImplementedError()
-	
+
 	def _decode_(self,data,index=0):
 		"""
 		decode a byte buffer
@@ -58,28 +60,28 @@ class GradientSegment(object):
 					self.leftColorType=int(data[13])
 					if len(data)>=15:
 						self.rightColorType=int(data[14])
-						
+
 	def toBytes(self):
 		"""
 		encode this to a byte array
 		"""
 		ret=[]
-		ret.append(self.leftPosition)
-		ret.append(self.middlePosition)
-		ret.append(self.rightPosition)
+		ret.append("%06f"%self.leftPosition)
+		ret.append("%06f"%self.middlePosition)
+		ret.append("%06f"%self.rightPosition)
 		for chan in self.leftColor:
-			ret.append(chan)
+			ret.append("%06f"%chan)
 		for chan in self.rightColor:
-			ret.append(chan)
+			ret.append("%06f"%chan)
 		if self.blendFunc is not None:
-			ret.append(self.blendFunc)
+			ret.append("%d"%self.blendFunc)
 			if self.colorType is not None:
-				ret.append(self.colorType)
+				ret.append("%d"%self.colorType)
 				if self.leftColorType is not None:
-					ret.append(self.leftColorType)
+					ret.append("%d"%self.leftColorType)
 					if self.rightColorType is not None:
-						ret.append(self.rightColorType)
-		return ' '.join(ret)
+						ret.append("%d"%self.rightColorType)
+		return (' '.join(ret))
 
 	def __repr__(self,indent=''):
 		"""
@@ -98,7 +100,7 @@ class GradientSegment(object):
 		return ('\n'+indent).join(ret)
 
 
-class GimpGgrGradient(object):
+class GimpGgrGradient:
 	"""
 	Gimp golor gradient
 
@@ -106,7 +108,7 @@ class GimpGgrGradient(object):
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/ggr.txt
 	"""
 
-	def __init__(self,filename):
+	def __init__(self,filename=None):
 		self.filename=None
 		self.segments=[]
 		self.name=''
@@ -136,7 +138,7 @@ class GimpGgrGradient(object):
 		:param data: data buffer to decode
 		:param index: index within the buffer to start at
 		"""
-		data=data.split('\n')
+		data=data.decode('utf-8').split('\n')
 		data=[l.strip() for l in data]
 		if data[0]!='GIMP Gradient':
 			raise Exception('File format error.  Magic value mismatch.')
@@ -146,7 +148,7 @@ class GimpGgrGradient(object):
 			gs=GradientSegment()
 			gs._decode_(data[i+3])
 			self.segments.append(gs)
-			
+
 	def toBytes(self):
 		"""
 		encode this to a byte array
@@ -156,7 +158,7 @@ class GimpGgrGradient(object):
 		ret.append(str(len(self.segments)))
 		for segment in self.segments:
 			ret.append(segment.toBytes())
-		return '\n'.join(ret)
+		return ('\n'.join(ret)+'\n').encode('utf-8')
 
 	def save(self,toFilename=None,toExtension=None):
 		"""
@@ -165,7 +167,7 @@ class GimpGgrGradient(object):
 		if not hasattr(toFilename,'write'):
 			f=open(toFilename,'wb')
 		f.write(self.toBytes())
-		
+
 	def getColor(self,percent):
 		"""
 		given a decimal percent (1.0 = 100%) retrieve

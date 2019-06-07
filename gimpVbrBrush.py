@@ -3,11 +3,9 @@
 """
 Pure python implementation of the gimp vbr brush format
 """
-import struct
-import PIL.Image
-	
 
-class GimpVbrBrush(object):
+
+class GimpVbrBrush:
 	"""
 	Pure python implementation of the gimp vbr brush format
 
@@ -17,7 +15,7 @@ class GimpVbrBrush(object):
 
 	BRUSH_SHAPES=["circle","square","diamond"]
 
-	def __init__(self,filename):
+	def __init__(self,filename=None):
 		self.version=1.0
 		self.name=''
 		self.spacing=0
@@ -46,6 +44,13 @@ class GimpVbrBrush(object):
 		f.close()
 		self._decode_(data)
 
+	@property
+	def image(self):
+		"""
+		this parametric brush converted to a useable PIL image
+		"""
+		raise NotImplementedError() # TODO:
+
 	def _decode_(self,data,index=0):
 		"""
 		decode a byte buffer
@@ -58,14 +63,14 @@ class GimpVbrBrush(object):
 			raise Exception('File format error.  Magic value mismatch.')
 		self.version=float(data[1])
 		if self.version==1.0:
-			self.name=data[2].decode('UTF-8') # max len 255 bytes
+			self.name=data[2] # max len 255 bytes
 			self.spacing=float(data[3])
 			self.radius=float(data[4])
 			self.hardness=float(data[5])
 			self.aspectRatio=float(data[6])
 			self.angle=float(data[7])
 		elif self.version==1.5:
-			self.name=data[2].decode('UTF-8') # max len 255 bytes
+			self.name=data[2] # max len 255 bytes
 			self.brushShape=data[3] # one of the strings in self.BRUSH_SHAPES
 			self.spacing=float(data[4])
 			self.radius=float(data[5])
@@ -76,11 +81,51 @@ class GimpVbrBrush(object):
 		else:
 			raise Exception('Unknown version '+str(self.version))
 
+	def toBytes(self):
+		"""
+		encode to a raw data stream
+		"""
+		data=[]
+		data.append("GIMP-VBR")
+		data.append(str(self.version))
+		if self.version==1.0:
+			data.append(str(self.name))
+			data.append(str(self.spacing))
+			data.append(str(self.radius))
+			data.append(str(self.hardness))
+			data.append(str(self.aspectRatio))
+			data.append(str(self.angle))
+		elif self.version==1.5:
+			data.append(str(self.name))
+			data.append(str(self.brushShape))
+			data.append(str(self.spacing))
+			data.append(str(self.radius))
+			data.append(str(self.spikes))
+			data.append(str(self.hardness))
+			data.append(str(self.aspectRatio))
+			data.append(str(self.angle))
+		return ('\n'.join(data)+'\n').encode('utf-8')
+
 	def save(self,toFilename=None,toExtension=None):
 		"""
 		save this gimp image to a file
 		"""
-		raise NotImplementedError()
+		asImage=False
+		if toExtension is None:
+			if toFilename is not None:
+				toExtension=toFilename.rsplit('.',1)
+				if len(toExtension)>1:
+					toExtension=toExtension[-1]
+				else:
+					toExtension=None
+		if toExtension is not None and toExtension!='vbr':
+			asImage=True
+		if asImage:
+			self.image.save(toFilename)
+		else:
+			if not hasattr(toFilename,'write'):
+				f=open(toFilename,'wb')
+			f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""
@@ -99,6 +144,30 @@ class GimpVbrBrush(object):
 		ret.append('Brush Shape: '+str(self.brushShape))
 		ret.append('Spikes: '+str(self.spikes))
 		return '\n'.join(ret)
+
+	def __eq__(self,other):
+		"""
+		perform a comparison
+		"""
+		if other.name!=self.name:
+			return False
+		if other.version!=self.version:
+			return False
+		if other.spacing!=self.spacing:
+			return False
+		if other.radius!=self.radius:
+			return False
+		if other.hardness!=self.hardness:
+			return False
+		if other.aspectRatio!=self.aspectRatio:
+			return False
+		if other.angle!=self.angle:
+			return False
+		if other.brushShape!=self.brushShape:
+			return False
+		if other.spikes!=self.spikes:
+			return False
+		return True
 
 
 if __name__ == '__main__':

@@ -59,8 +59,9 @@ class IO(object):
 			self.data.extend(bytearray((self.index+size)-len(self.data)))
 		try:
 			struct.pack_into(fmt,self.data,self.index,data)
+			self.index+=size
 		except struct.error as e:
-			print(type(data),fmt,size)
+			raise Exception(type(data),fmt,size)
 			print(data)
 			raise e
 
@@ -171,7 +172,8 @@ class IO(object):
 	def i8(self,i8):
 		if self.littleEndian:
 			self.i8le=i8
-		self.i8be=i8
+		else:
+			self.i8be=i8
 	@property
 	def u8(self):
 		if self.littleEndian:
@@ -181,7 +183,8 @@ class IO(object):
 	def u8(self,u8):
 		if self.littleEndian:
 			self.u8le=u8
-		self.u8be=u8
+		else:
+			self.u8be=u8
 	@property
 	def i16(self):
 		if self.littleEndian:
@@ -191,7 +194,8 @@ class IO(object):
 	def i16(self,i16):
 		if self.littleEndian:
 			self.i16le=i16
-		self.i16be=i16
+		else:
+			self.i16be=i16
 	@property
 	def u16(self):
 		if self.littleEndian:
@@ -201,7 +205,8 @@ class IO(object):
 	def u16(self,u16):
 		if self.littleEndian:
 			self.u16le=u16
-		self.u16be=u16
+		else:
+			self.u16be=u16
 	@property
 	def i32(self):
 		if self.littleEndian:
@@ -211,7 +216,8 @@ class IO(object):
 	def i32(self,i32):
 		if self.littleEndian:
 			self.i32le=i32
-		self.i32be=i32
+		else:
+			self.i32be=i32
 	@property
 	def u32(self):
 		if self.littleEndian:
@@ -221,7 +227,8 @@ class IO(object):
 	def u32(self,u32):
 		if self.littleEndian:
 			self.u32le=u32
-		self.u32be=u32
+		else:
+			self.u32be=u32
 	@property
 	def i64(self):
 		if self.littleEndian:
@@ -231,7 +238,8 @@ class IO(object):
 	def i64(self,i64):
 		if self.littleEndian:
 			self.i64le=i64
-		self.i64be=i64
+		else:
+			self.i64be=i64
 	@property
 	def u64(self):
 		if self.littleEndian:
@@ -241,7 +249,8 @@ class IO(object):
 	def u64(self,u64):
 		if self.littleEndian:
 			self.u64le=u64
-		self.u64be=u64
+		else:
+			self.u64be=u64
 	@property
 	def float32(self):
 		if self.littleEndian:
@@ -251,7 +260,8 @@ class IO(object):
 	def float32(self,float32):
 		if self.littleEndian:
 			self.float32le=float32
-		self.float32be=float32
+		else:
+			self.float32be=float32
 	@property
 	def float64(self):
 		if self.littleEndian:
@@ -261,7 +271,8 @@ class IO(object):
 	def float64(self,float64):
 		if self.littleEndian:
 			self.float64le=float64
-		self.float64be=float64
+		else:
+			self.float64be=float64
 
 	@property
 	def u8be(self):
@@ -363,7 +374,7 @@ class IO(object):
 		return d
 	@u32be.setter
 	def u32be(self,u32be):
-		self._write(4,'>I',u32be)
+		self._write(4,'>I',int(u32be))
 	@property
 	def u32le(self):
 		"""
@@ -391,12 +402,15 @@ class IO(object):
 		"""
 		read the next signed int32 and advance the index
 		"""
-		d=struct.unpack('>i',self.data[self.index:self.index+4])[0]
+		try:
+			d=struct.unpack('>i',self.data[self.index:self.index+4])[0]
+		except Exception as e:
+			raise Exception(str(self.index)+' '+str(len(self.data))+' '+str(self.data[self.index:self.index+4]))
 		self.index+=4
 		return d
 	@i32be.setter
 	def i32be(self,i32be):
-		self._write(4,'>i',i32be)
+		self._write(4,'>i',int(i32be))
 
 	@property
 	def u64be(self):

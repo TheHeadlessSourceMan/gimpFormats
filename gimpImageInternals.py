@@ -9,7 +9,7 @@ in this file.
 """
 import zlib
 import PIL.Image
-from gimpIOBase import *
+from .gimpIOBase import *
 
 
 class GimpChannel(GimpIOBase):
@@ -136,6 +136,8 @@ class GimpImageHierarchy(GimpIOBase):
 		:param data: data buffer to decode
 		:param index: index within the buffer to start at
 		"""
+		if not data:
+			raise Exception('No data!')
 		io=IO(data,index)
 		#print 'Decoding channel at',index
 		self.width=io.u32

@@ -3,19 +3,18 @@
 """
 Pure python implementation of a gimp pattern file
 """
-import struct
 import PIL.Image
-from binaryIO import *
-	
+from .binaryIO import *
 
-class GimpPatPattern(object):
+
+class GimpPatPattern:
 	"""
 	Pure python implementation of a gimp pattern file
 
 	See:
 		https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/pat.txt
 	"""
-	
+
 	COLOR_MODES=[None,'L','LA','RGB','RGBA']
 
 	def __init__(self,filename=None):
@@ -27,6 +26,7 @@ class GimpPatPattern(object):
 		self.mode=self.COLOR_MODES[self.bpp]
 		self.name=''
 		self._rawImage=None
+		self._image=None
 		if filename is not None:
 			self.load(filename)
 
@@ -61,13 +61,13 @@ class GimpPatPattern(object):
 		self.bpp=io.u32
 		self.mode=self.COLOR_MODES[self.bpp]
 		magic=io.getBytes(4)
-		if magic!='GPAT':
+		if magic.decode('ascii')!='GPAT':
 			raise Exception('File format error.  Magic value mismatch.')
 		nameLen=headerSize-io.index
 		self.name=io.getBytes(nameLen).decode('UTF-8')
 		self._rawImage=io.getBytes(self.width*self.height*self.bpp)
 		self._image=None
-		
+
 	def toBytes(self):
 		"""
 		encode to a byte buffer
@@ -79,7 +79,7 @@ class GimpPatPattern(object):
 		io.u32=self.height
 		io.u32=len(self.image.mode)
 		io.addBytes('GPAT')
-		io.addBytes(self.name)
+		io.addBytes(self.name.encode('utf-8'))
 		if self._rawImage is None:
 			rawImage=self.image.tobytes(encoder_name='raw')
 		else:
@@ -99,7 +99,7 @@ class GimpPatPattern(object):
 		"""
 		get a final, compiled image
 		"""
-		if self._image==None:
+		if self._image is None:
 			if self._rawImage is None:
 				return None
 			self._image=PIL.Image.frombytes(self.mode,self.size,self._rawImage,decoder_name='raw')
@@ -113,9 +113,22 @@ class GimpPatPattern(object):
 		"""
 		save this gimp image to a file
 		"""
-		if not hasattr(toFilename,'write'):
-			f=open(toFilename,'wb')
-		f.write(self.toBytes())
+		asImage=False
+		if toExtension is None:
+			if toFilename is not None:
+				toExtension=toFilename.rsplit('.',1)
+				if len(toExtension)>1:
+					toExtension=toExtension[-1]
+				else:
+					toExtension=None
+		if toExtension is not None and toExtension!='pat':
+			asImage=True
+		if asImage:
+			self.image.save(toFilename)
+		else:
+			if not hasattr(toFilename,'write'):
+				f=open(toFilename,'wb')
+			f.write(self.toBytes())
 
 	def __repr__(self,indent=''):
 		"""

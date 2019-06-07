@@ -3,14 +3,35 @@
 """
 Pure python implementation of the gimp file formats
 """
-from gimpXcfDocument import *
-from gimpGbrBrush import *
-from gimpGgrGradient import *
-from gimpGihBrush import *
-from gimpGpbBrush import *
-from gimpGtpToolPreset import *
-from gimpPatPattern import *
-from gimpVbrBrush import *
+from .gimpXcfDocument import *
+from .gimpGbrBrush import *
+from .gimpGgrGradient import *
+from .gimpGihBrushSet import *
+from .gimpGpbBrush import *
+from .gimpGtpToolPreset import *
+from .gimpPatPattern import *
+from .gimpVbrBrush import *
+
+
+register=False
+
+
+class GimpFormatPlugin:
+	pass
+	
+
+# ========= automatically add format info for pyformatgenie =========
+if register:
+	try:
+		# will run this every time this module is loaded
+		import pyformatgenie
+		pfg=pyformatgenie.PyFormatGenie()
+		pfg.add(GimpFormatPlugin)
+		# and the most important part...
+		pfg.save()
+	except ImportError as e:
+		# pyformatgenie is not installed (yet?). Continue with whatever you came here for.
+		pass
 
 
 if __name__ == '__main__':
