@@ -8,4 +8,4 @@ install:
   - pip install codecov
   
 # command to run tests
-script: coverage run test/test.py
+script: cd test && coverage run test.py
