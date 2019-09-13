@@ -413,7 +413,10 @@ class GimpIOBase(object):
 		elif propertyType==self.PROP_VECTORS:
 			self._vectorsDecode_(data)
 		elif propertyType==self.PROP_TEXT_LAYER_FLAGS:
-			self.textLayerFlags=int(data)
+			if isinstance(data, bytes):
+				self.textLayerFlags=int.from_bytes(data, byteorder='big')
+			else:
+				self.textLayerFlags=int(data)
 		elif propertyType==self.PROP_OLD_SAMPLE_POINTS:
 			raise Exception("ERR: old sample points structure not supported")
 		elif propertyType==self.PROP_LOCK_CONTENT:
