@@ -4,47 +4,60 @@
 Run unit tests
 
 See:
-	http://pyunit.sourceforge.net/pyunit.html
+    http://pyunit.sourceforge.net/pyunit.html
 """
 import unittest
 import os
 from gimpFormats import *
-from smartimage.imgTools import *
+from imageTools import *
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
 class Test(unittest.TestCase):
-	"""
-	Run unit test
-	"""
+    """
+    Run unit test
+    """
 
-	def setUp(self):
-		self.dut=GimpGplPalette()
-		
-	def tearDown(self):
-		pass
-		
-	def testPlasma(self):
-		self.dut.load(__HERE__+'Plasma.gpl')
-		# test round-trip compatibility
-		self.dut.save(__HERE__+'actualOutput_Plasma.gpl')
-		original=open(__HERE__+'Plasma.gpl','rb').read()
-		actual=open(__HERE__+'actualOutput_Plasma.gpl','rb').read()
-		assert actual==original
-		os.remove(__HERE__+'actualOutput_Plasma.gpl')
+    def setUp(self):
+        self.dut=GimpGplPalette()
+        
+    def tearDown(self):
+        pass
+        
+    def testPlasma(self):
+        self.dut.load(__HERE__+'Plasma.gpl')
+        # test string representation
+        asStr=self.dut.__repr__()
+        assert asStr
+        # test round-trip compatibility
+        self.dut.save(__HERE__+'actualOutput_Plasma.gpl')
+        original=open(__HERE__+'Plasma.gpl','rb').read()
+        actual=open(__HERE__+'actualOutput_Plasma.gpl','rb').read()
+        assert actual==original
+        os.remove(__HERE__+'actualOutput_Plasma.gpl')
 
-		
+        
 def testSuite():
-	"""
-	Combine unit tests into an entire suite
-	"""
-	testSuite = unittest.TestSuite()
-	testSuite.addTest(Test("testPlasma"))
-	return testSuite
-		
-		
-if __name__ == '__main__':
-	"""
-	Run all the test suites in the standard way.
-	"""
-	unittest.main()
+    """
+    Combine unit tests into an entire suite
+    """
+    testSuite = unittest.TestSuite()
+    testSuite.addTest(Test("testPlasma"))
+    return testSuite
+        
+        
+def cmdline(args):
+    """
+    Run the command line
+
+    :param args: command line arguments (WITHOUT the filename)
+    """
+    """
+    Run all the test suites in the standard way.
+    """
+    unittest.main()
+
+
+if __name__=='__main__':
+    import sys
+    cmdline(sys.argv[1:])

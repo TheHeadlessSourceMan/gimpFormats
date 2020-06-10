@@ -1,5 +1,5 @@
 ﻿[PyScripter]
-Version=3.6.0.0
+Version=3.6.3.0
 
 [Project]
 ClassName=TProjectRootNode
@@ -11,73 +11,164 @@ ClassName=TProjectFilesNode
 
 [Project\ChildNodes\Node0\ChildNodes\Node0]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]binaryIO.py
+FileName=$[Project-Path]__init__.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node1]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpFormat.py
+FileName=$[Project-Path]binaryIO.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node2]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpGbrBrush.py
+FileName=$[Project-Path]gimpFormat.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node3]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpGgrGradient.py
+FileName=$[Project-Path]gimpGbrBrush.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node4]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpGihBrushSet.py
+FileName=$[Project-Path]gimpGgrGradient.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node5]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpGpbBrush.py
+FileName=$[Project-Path]gimpGihBrushSet.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node6]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpGtpToolPreset.py
+FileName=$[Project-Path]gimpGpbBrush.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node7]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpImageInternals.py
+FileName=$[Project-Path]gimpGplPalette.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node8]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpIOBase.py
+FileName=$[Project-Path]gimpGtpToolPreset.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node9]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpParasites.py
+FileName=$[Project-Path]gimpImageInternals.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node10]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpPatPattern.py
+FileName=$[Project-Path]gimpIOBase.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node11]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpVbrBrush.py
+FileName=$[Project-Path]gimpParasites.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node12]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpVectors.py
+FileName=$[Project-Path]gimpPatPattern.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node13]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]gimpXcfDocument.py
+FileName=$[Project-Path]gimpVbrBrush.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node14]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]setup.py
+FileName=$[Project-Path]gimpVectors.py
 
 [Project\ChildNodes\Node0\ChildNodes\Node15]
 ClassName=TProjectFileNode
-FileName=$[Project-Path]__init__.py
+FileName=$[Project-Path]gimpXcfDocument.py
+
+[Project\ChildNodes\Node0\ChildNodes\Node16]
+ClassName=TProjectFileNode
+FileName=$[Project-Path]setup.py
 
 [Project\ChildNodes\Node0\ChildNodes]
-Count=16
+Count=17
 
 [Project\ChildNodes\Node1]
 ClassName=TProjectRunConfiguationsNode
+
+[Project\ChildNodes\Node1\ChildNodes\Node0]
+ClassName=TProjectRunConfiguationNode
+Name=all tests
+
+[Project\ChildNodes\Node1\ChildNodes\Node0\RunConfig]
+ScriptName=coverage -run C:\backed_up\computers\formats\gimpFormats\test\test.py
+Description=run all tests
+EngineType=peRemote
+ReinitializeBeforeRun=TRUE
+WorkingDir=$[ActiveScript-Dir]
+WriteOutputToFile=FALSE
+OutputFileName=$[ActiveScript-NoExt].log
+AppendToFile=FALSE
+
+[Project\ChildNodes\Node1\ChildNodes\Node0\RunConfig\ExternalRun]
+Caption=External Run
+Description=Run script using an external Python Interpreter
+ApplicationName=$[PythonExe-Short]
+Parameters=$[ActiveScript-Short]
+WorkingDirectory=$[ActiveScript-Dir]
+
+[Project\ChildNodes\Node1\ChildNodes\Node1]
+ClassName=TProjectRunConfiguationNode
+Name=simple xcf unit test
+
+[Project\ChildNodes\Node1\ChildNodes\Node1\RunConfig]
+ScriptName=C:\backed_up\computers\formats\gimpFormats\test\simpleXcfRead\test.py
+EngineType=peRemote
+ReinitializeBeforeRun=TRUE
+WorkingDir=$[ActiveScript-Dir]
+WriteOutputToFile=FALSE
+OutputFileName=$[ActiveScript-NoExt].log
+AppendToFile=FALSE
+
+[Project\ChildNodes\Node1\ChildNodes\Node1\RunConfig\ExternalRun]
+Caption=External Run
+Description=Run script using an external Python Interpreter
+ApplicationName=$[PythonExe-Short]
+Parameters=$[ActiveScript-Short]
+WorkingDirectory=$[ActiveScript-Dir]
+
+[Project\ChildNodes\Node1\ChildNodes\Node2]
+ClassName=TProjectRunConfiguationNode
+Name=show gimp image
+
+[Project\ChildNodes\Node1\ChildNodes\Node2\RunConfig]
+ScriptName=C:\backed_up\computers\formats\gimpFormats\gimpXcfDocument.py
+EngineType=peRemote
+ReinitializeBeforeRun=TRUE
+Parameters=test\simpleXcfRead\one_layer_with_transparency.xcf  --show
+WorkingDir=$[ActiveScript-Dir]
+WriteOutputToFile=FALSE
+OutputFileName=$[ActiveScript-NoExt].log
+AppendToFile=FALSE
+
+[Project\ChildNodes\Node1\ChildNodes\Node2\RunConfig\ExternalRun]
+Caption=External Run
+Description=Run script using an external Python Interpreter
+ApplicationName=$[PythonExe-Short]
+Parameters=$[ActiveScript-Short]
+WorkingDirectory=$[ActiveScript-Dir]
+
+[Project\ChildNodes\Node1\ChildNodes\Node3]
+ClassName=TProjectRunConfiguationNode
+Name=save smartimage
+
+[Project\ChildNodes\Node1\ChildNodes\Node3\RunConfig]
+ScriptName=C:\backed_up\computers\formats\gimpFormats\gimpXcfDocument.py
+Description=saves out to test.simg
+EngineType=peRemote
+ReinitializeBeforeRun=TRUE
+Parameters=test\simpleXcfRead\one_layer_with_transparency.xcf  --save=test.simg
+WorkingDir=$[ActiveScript-Dir]
+WriteOutputToFile=FALSE
+OutputFileName=$[ActiveScript-NoExt].log
+AppendToFile=FALSE
+
+[Project\ChildNodes\Node1\ChildNodes\Node3\RunConfig\ExternalRun]
+Caption=External Run
+Description=Run script using an external Python Interpreter
+ApplicationName=$[PythonExe-Short]
+Parameters=$[ActiveScript-Short]
+WorkingDirectory=$[ActiveScript-Dir]
+
+[Project\ChildNodes\Node1\ChildNodes]
+Count=4
 
 [Project\ChildNodes]
 Count=2

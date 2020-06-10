@@ -4,69 +4,85 @@
 Run unit tests
 
 See:
-	http://pyunit.sourceforge.net/pyunit.html
+    http://pyunit.sourceforge.net/pyunit.html
 """
 import unittest
 import os
 from gimpFormats import *
-from smartimage.imgTools import *
+from imageTools import *
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
 class Test(unittest.TestCase):
-	"""
-	Run unit test
-	"""
+    """
+    Run unit test
+    """
 
-	def setUp(self):
-		self.dut=GimpPatPattern()
-		
-	def tearDown(self):
-		pass
-		
-	def test3dgreen(self):
-		self.dut.load(__HERE__+'3dgreen.pat')
-		# test image saving (implicit)
-		self.dut.save(__HERE__+'actualOutput_3dgreen.png')
-		# test for image match
-		same=compareImage(self.dut.image,__HERE__+'desiredOutput_3dgreen.png')
-		assert same
-		os.remove(__HERE__+'actualOutput_3dgreen.png')
-		# test round-trip compatibility
-		self.dut.save(__HERE__+'actualOutput_3dgreen.pat')
-		original=open(__HERE__+'3dgreen.pat','rb').read()
-		actual=open(__HERE__+'actualOutput_3dgreen.pat','rb').read()
-		assert actual==original
-		os.remove(__HERE__+'actualOutput_3dgreen.pat')
-		
-	def testLeopard(self):
-		self.dut.load(__HERE__+'leopard.pat')
-		# test image saving (explicit)
-		self.dut.image.save(__HERE__+'actualOutput_leopard.png')
-		# test for image match
-		same=compareImage(self.dut.image,__HERE__+'desiredOutput_leopard.png')
-		assert same
-		os.remove(__HERE__+'actualOutput_leopard.png')
-		# test round-trip compatibility
-		self.dut.save(__HERE__+'actualOutput_leopard.pat')
-		original=open(__HERE__+'leopard.pat','rb').read()
-		actual=open(__HERE__+'actualOutput_leopard.pat','rb').read()
-		assert actual==original
-		os.remove(__HERE__+'actualOutput_leopard.pat')
+    def setUp(self):
+        self.dut=GimpPatPattern()
+        
+    def tearDown(self):
+        pass
+        
+    def test3dgreen(self):
+        self.dut.load(__HERE__+'3dgreen.pat')
+        # test string representation
+        asStr=self.dut.__repr__()
+        assert asStr
+        # test image saving (implicit)
+        self.dut.save(__HERE__+'actualOutput_3dgreen.png')
+        # test for image match
+        same=compareImage(self.dut.image,__HERE__+'desiredOutput_3dgreen.png')
+        assert same
+        os.remove(__HERE__+'actualOutput_3dgreen.png')
+        # test round-trip compatibility
+        self.dut.save(__HERE__+'actualOutput_3dgreen.pat')
+        original=open(__HERE__+'3dgreen.pat','rb').read()
+        actual=open(__HERE__+'actualOutput_3dgreen.pat','rb').read()
+        assert actual==original
+        os.remove(__HERE__+'actualOutput_3dgreen.pat')
+        
+    def testLeopard(self):
+        self.dut.load(__HERE__+'leopard.pat')
+        # test string representation
+        asStr=self.dut.__repr__()
+        assert asStr
+        # test image saving (explicit)
+        self.dut.image.save(__HERE__+'actualOutput_leopard.png')
+        # test for image match
+        same=compareImage(self.dut.image,__HERE__+'desiredOutput_leopard.png')
+        assert same
+        os.remove(__HERE__+'actualOutput_leopard.png')
+        # test round-trip compatibility
+        self.dut.save(__HERE__+'actualOutput_leopard.pat')
+        original=open(__HERE__+'leopard.pat','rb').read()
+        actual=open(__HERE__+'actualOutput_leopard.pat','rb').read()
+        assert actual==original
+        os.remove(__HERE__+'actualOutput_leopard.pat')
 
-		
+        
 def testSuite():
-	"""
-	Combine unit tests into an entire suite
-	"""
-	testSuite = unittest.TestSuite()
-	testSuite.addTest(Test("test3dgreen"))
-	testSuite.addTest(Test("testLeopard"))
-	return testSuite
-		
-		
-if __name__ == '__main__':
-	"""
-	Run all the test suites in the standard way.
-	"""
-	unittest.main()
+    """
+    Combine unit tests into an entire suite
+    """
+    testSuite = unittest.TestSuite()
+    testSuite.addTest(Test("test3dgreen"))
+    testSuite.addTest(Test("testLeopard"))
+    return testSuite
+        
+        
+def cmdline(args):
+    """
+    Run the command line
+
+    :param args: command line arguments (WITHOUT the filename)
+    """
+    """
+    Run all the test suites in the standard way.
+    """
+    unittest.main()
+
+
+if __name__=='__main__':
+    import sys
+    cmdline(sys.argv[1:])

@@ -1,3 +1,8 @@
+"""
+Pure python implementation of the gimp file formats
+
+@supports: pyformatgenie
+"""
 from .gimpFormat import *
 from .gimpGbrBrush import *
 from .gimpGgrGradient import *
