@@ -69,7 +69,7 @@ class GimpGplPalette:
                 continue
             self.colors.append((int(line[0]),int(line[1]),int(line[2])))
             if len(line)>3:
-                self.colorNames.append(line[3])
+                self.colorNames.append(' '.join(line[3:]))
             else:
                 self.colorNames.append(None)
 
