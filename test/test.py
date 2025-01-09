@@ -7,9 +7,12 @@ See:
     http://pyunit.sourceforge.net/pyunit.html
 """
 import unittest
-import os,sys
-
+import os
+import sys
 import numpy as np
+from imageTools import (makeSameMode,defaultLoader,numpyArray)
+
+
 def compareImage(img1,img2,tolerance=0.99999):
     """
     images can be a pil image, rgb numpy array, url, or filename
@@ -23,14 +26,14 @@ def compareImage(img1,img2,tolerance=0.99999):
     return np.allclose(img1,img2,rtol=tolerance)
 
 TESTS=[
-    'cli_help', # make sure those things with command lines are minimally working
+    'cli_help', # make sure those things with command lines are minimally working # noqa: E501
     'exportedPaths', # TODO: Feature not yet implemented
-    'gbrBrush', 
+    'gbrBrush',
     'ggrGradient',
-    'gihBrushSet', # Broken - size of embedded gbrBrushes are different than standard!
+    'gihBrushSet', # Broken - size of embedded gbrBrushes are different than standard! # noqa: E501
     'gpbBrush', # TODO: Need to locate sample files from somewhere
     'gplPalette',
-    'gtpToolPreset', # Broken - took a big risk rolling my own parser, now I'm paying the price
+    'gtpToolPreset', # Broken - took a big risk rolling my own parser, now I'm paying the price # noqa: E501 # pylint: disable=line-too-long
     'patPattern',
     'vbrBrush',
     # --- the rest are .xcf file
@@ -55,17 +58,21 @@ def suite(tests=None):
             fullDirname=__HERE__+os.sep+dirname
             if os.path.exists(fullDirname+os.sep+'test.py'):
                 print('Queueing test: '+dirname)
-                exec('import '+dirname)
-                exec('testSuite.addTest('+dirname+'.testSuite())')
+                exec('import '+dirname) # type: ignore # pylint: disable=exec-used # noqa: E501
+                exec('testSuite.addTest('+dirname+'.testSuite())') # type: ignore # pylint: disable=exec-used # noqa: E501
     return testSuite
 
 
 def run(tests=None,output=None,verbosity=2,failfast=False):
+    """
+    Run the tests
+    """
     if output is None:
         output=sys.stdout
     else:
         output=open(output,'wb')
-    runner=unittest.TextTestRunner(output,verbosity=verbosity,failfast=failfast)
+    runner=unittest.TextTestRunner(
+        output,verbosity=verbosity,failfast=failfast)
     runner.run(suite(tests))
 
 
@@ -79,7 +86,7 @@ def cmdline(args):
     save=None
     tests=[]
     if not args:
-        pass#printhelp=True
+        pass #printhelp=True
     else:
         for arg in args:
             if arg.startswith('-'):
@@ -96,11 +103,11 @@ def cmdline(args):
         print('Usage:')
         print('  test.py [options] [tests]')
         print('Options:')
-        print('   --save=filename ............... save the test output to this file, rather than the console')
+        print('   --save=filename ....... save the test output to this file,')
+        print('              rather than the console')
     else:
         run(tests,save)
 
 
 if __name__=='__main__':
-    import sys
     cmdline(sys.argv[1:])

@@ -9,28 +9,30 @@ See:
 import unittest
 import os
 import sys
-import smartimage
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
 class Test(unittest.TestCase):
     """
     Run unit test
-    
+
     Check the command line help for each module
     """
-    
+
     def __init__(self,testName):
         unittest.TestCase.__init__(self,testName)
         self.cmd=None
-        
+
     def setUp(self):
         pass
-        
+
     def tearDown(self):
         pass
-        
+
     def testName(self):
+        """
+        run the tests
+        """
         names=[ # scripts that have a command line interface
             '../gimpFormat.py',
             '../gimpGbrBrush.py',
@@ -45,15 +47,18 @@ class Test(unittest.TestCase):
             ]
         for filename in names:
             self.runScript(filename,'--help')
-    
+
     def runScript(self,filename,*args):
-        from importlib.util import spec_from_loader, module_from_spec
+        """
+        run a single script
+        """
+        from importlib.util import spec_from_loader,module_from_spec
         from importlib.machinery import SourceFileLoader
         path=filename.rsplit(os.sep,1)
         module=path[-1].rsplit('.py',1)[0]
         path=path[0]
         print('Test CLI:',module,filename)
-        spec = spec_from_loader(module, SourceFileLoader(module,filename))
+        spec = spec_from_loader(module,SourceFileLoader(module,filename))
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
         if 'cmdline' in dir(module):
@@ -62,7 +67,7 @@ class Test(unittest.TestCase):
         else:
             print('SKIP: '+filename+' '+(' '.join(args)))
             #print(dir(module))
-    
+
     def runScriptOld(self,filename,*args):
         """
         This works 100% fine, but does not add to the code coverage metrics
@@ -76,12 +81,12 @@ class Test(unittest.TestCase):
         globalz['__package__']='smartimage'
         globalz['__name__']='__main__'
         try:
-            code=open(filename).read()
+            code=open(filename,'r',encoding="utf-8").read()
             if code.find('__main__')>=0:
-                exec(code,globalz)
+                exec(code,globalz) # pylint: disable=exec-used
         finally:
             sys.argv=bak
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -89,20 +94,19 @@ def testSuite():
     testSuite = unittest.TestSuite()
     testSuite.addTest(Test("testName"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 
 if __name__=='__main__':
-    import sys
     cmdline(sys.argv[1:])

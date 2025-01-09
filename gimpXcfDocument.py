@@ -13,12 +13,14 @@ Currently not supporting:
     Programatically alter documents (add layer, etc)
     Rendering a final, compositied image
 """
-from typing import Any, Union, BinaryIO, List
+import typing
+import PIL.Image
+from enums import COLOR_MODES
 from gimpFormats.binaryIO import IO
 from gimpFormats.gimpIOBase import GimpIOBase
-from gimpFormats.gimpImageInternals import GimpChannel, GimpImageHierarchy
+from gimpFormats.gimpImageInternals import GimpChannel,GimpImageHierarchy
 try:
-    import smartimage
+    import smartimage # type: ignore
     has_smartimage=True
 except ImportError:
     has_smartimage=False
@@ -29,12 +31,17 @@ class GimpLayer(GimpIOBase):
     Represents a single layer in a gimp image
     """
 
-    COLOR_MODES=['RGB color without alpha','RGB color with alpha',
+    COLOR_MODE_DESCRIPTIONS:typing.List[str]=[
+        'RGB color without alpha','RGB color with alpha',
         'Grayscale without alpha','Grayscale with alpha',
         'Indexed without alpha','Indexed with alpha']
     PIL_MODE_TO_LAYER_MODE={'L':2,'LA':3,'RGB':0,'RGBA':1}
 
-    def __init__(self,parent,name=None,image:Union['PIL.Image',None]=None):
+    def __init__(self,
+        parent:typing.Optional[GimpIOBase],
+        name:typing.Optional[str]=None,
+        image:typing.Optional[PIL.Image.Image]=None):
+        """ """
         GimpIOBase.__init__(self,parent)
         if name is None:
             name=''
@@ -42,20 +49,20 @@ class GimpLayer(GimpIOBase):
         self.height:int=0
         self.colorMode:int=0
         self.name:str=name
-        self._imageHierarchy:Union[GimpImageHierarchy,None]=None
-        self._imageHierarchyPtr:Union[int,None]=None
-        self._mask:Union[GimpChannel,None]=None
-        self._maskPtr:Union[int,None]=None
-        self._data:Union[None,bytearray]=None
+        self._imageHierarchy:typing.Optional[GimpImageHierarchy]=None
+        self._imageHierarchyPtr:typing.Optional[int]=None
+        self._mask:typing.Optional[GimpChannel]=None
+        self._maskPtr:typing.Optional[int]=None
+        self._data:typing.Optional[bytes]=None
         if image is not None:
-            self.image=image # done last as it resets some of the above defaults
+            self.image=image # last, as it resets some of the above defaults
 
-    def fromBytes(self,data,index=0):
+    def fromBytes(self,data:bytes,index:int=0)->int:
         """
         alias for _decode_()
         """
         return self._decode_(data,index)
-    def _decode_(self,data,index=0):
+    def _decode_(self,data:bytes,index:int=0)->int:
         """
         decode a byte buffer
 
@@ -66,7 +73,7 @@ class GimpLayer(GimpIOBase):
         #print('Decoding Layer at',index)
         self.width=io.u32
         self.height=io.u32
-        self.colorMode=io.u32 # one of self.COLOR_MODES
+        self.colorMode=io.u32 # one of self.COLOR_MODE_DESCRIPTIONS
         self.name=io.sz754
         self._propertiesDecode_(io)
         self._imageHierarchyPtr=self._pointerDecode_(io)
@@ -75,7 +82,7 @@ class GimpLayer(GimpIOBase):
         self._data=data
         return io.index
 
-    def toBytes(self):
+    def toBytes(self)->bytes:
         """
         encode to byte array
         """
@@ -95,7 +102,10 @@ class GimpLayer(GimpIOBase):
         io.addBytes(dataAreaIO)
         return io.data
 
-    def _addToSmartimage(self,si,parentLayer=None):
+    def _addToSmartimage(self,
+        si:typing.Any,
+        parentLayer:typing.Optional[PIL.Image.Image]=None
+        )->typing.Any:
         """
         add this layer to a smartimage document
         """
@@ -163,22 +173,28 @@ class GimpLayer(GimpIOBase):
             ('Split'),
             ('Pass through')]
         if not self.isGroup and self.image is not None:
-            l=smartimage.ImageLayer(si,parentLayer)
-            l.image=self.image
+            layer=smartimage.ImageLayer(si,parentLayer)
+            layer.image=self.image
         else:
-            l=smartimage.Layer(si,parentLayer)
-        l.name=self.name
-        l.w=self.width
-        l.h=self.height
+            layer=smartimage.Layer(si,parentLayer)
+        layer.name=self.name
+        layer.w=self.width
+        layer.h=self.height
         #l.mask=self.mask
-        l.opacity=self.opacity
-        l.blendMode=BLEND_MODE_MAP[self.blendMode]
-        if isinstance(l.blendMode,tuple):
-            raise NotImplementedError('Unimplemented blend mode conversion "%s"'%l.blendMode[0])
+        layer.opacity=self.opacity
+        # remap the Gimp blend mode to a smartimage blend mode
+        if self.blendMode is None:
+            layer.blendMode=None
+        else:
+            layer.blendMode=BLEND_MODE_MAP[self.blendMode.value]
+        if isinstance(layer.blendMode,tuple):
+            msg=f'Unimplemented blend mode conversion "{layer.blendMode[0]}"'
+            raise NotImplementedError(msg)
 
-    def _convertToSmartimage(self):
+    def _convertToSmartimage(self)->typing.Any:
         """
-        create a new smartimage document that encoumpasses all features of this xcf
+        create a new smartimage document that includes
+        all features of this xcf
 
         requires the smartimage library
 
@@ -190,19 +206,22 @@ class GimpLayer(GimpIOBase):
         self._addToSmartimage(si)
         return si
 
-
     @property
-    def mask(self):
+    def mask(self)->typing.Optional[GimpChannel]:
         """
         Get the layer mask
         """
-        if self._mask is None and self._maskPtr is not None and self._maskPtr!=0:
+        if self._mask is None \
+            and self._maskPtr is not None \
+            and self._maskPtr!=0:
+            #
             self._mask=GimpChannel(self)
-            self._mask.fromBytes(self._data,self._maskPtr)
+            if self._data is not None:
+                self._mask.fromBytes(self._data,self._maskPtr)
         return self._mask
 
     @property
-    def image(self):
+    def image(self)->typing.Optional[PIL.Image.Image]:
         """
         get the layer image
 
@@ -212,7 +231,7 @@ class GimpLayer(GimpIOBase):
             return None
         return self.imageHierarchy.image
     @image.setter
-    def image(self,image):
+    def image(self,image:PIL.Image.Image):
         """
         set the layer image
 
@@ -221,16 +240,16 @@ class GimpLayer(GimpIOBase):
         self.height=image.height
         self.width=image.width
         if image.mode not in self.PIL_MODE_TO_LAYER_MODE:
-            raise NotImplementedError('No way of handlng PIL image mode "'+image.mode+'"')
+            msg=f'No way of handlng PIL image mode "{image.mode}"'
+            raise NotImplementedError(msg)
         self.colorMode=self.PIL_MODE_TO_LAYER_MODE[image.mode]
         if not self.name and isinstance(image,str):
             # try to use a filename as the name
             self.name=image.rsplit('\\',1)[-1].rsplit('/',1)[-1]
-        self.imageHierarchy=GimpImageHierarchy(self)
-        self.imageHierarchy.image=image
+        self._imageHierarchy=GimpImageHierarchy(self,image)
 
     @property
-    def imageHierarchy(self):
+    def imageHierarchy(self)->typing.Optional[GimpImageHierarchy]:
         """
         Get the image hierarchy objects
 
@@ -239,29 +258,34 @@ class GimpLayer(GimpIOBase):
 
         NOTE: can return None if it has been fully read into an image
         """
-        if self._imageHierarchy is None and self._imageHierarchyPtr>0:
+        if self._imageHierarchy is None \
+            and self._imageHierarchyPtr is not None \
+            and self._imageHierarchyPtr>0 \
+            and self._data is not None:
+            #
             self._imageHierarchy=GimpImageHierarchy(self)
             self._imageHierarchy.fromBytes(self._data,self._imageHierarchyPtr)
         return self._imageHierarchy
 
-    def _forceFullyLoaded(self):
+    def _forceFullyLoaded(self)->None:
         """
         make sure everything is fully loaded from the file
         """
         if self.mask is not None:
-            self.mask._forceFullyLoaded()
-        _=self.image # make sure the image is loaded so we can delete the hierarchy nonsense
+            self.mask._forceFullyLoaded() # pylint: disable=protected-access
+        # make sure the image is loaded so we can delete the hierarchy nonsense
+        _=self.image
         self._imageHierarchy=None
         self._data=None
 
-    def __repr__(self,indent=''):
+    def __repr__(self,indent:str='')->str:
         """
         Get a textual representation of this object
         """
         ret=[]
         ret.append('Name: '+str(self.name))
         ret.append('Size: '+str(self.width)+' x '+str(self.height))
-        ret.append('colorMode: '+self.COLOR_MODES[self.colorMode])
+        ret.append('colorMode: '+self.COLOR_MODE_DESCRIPTIONS[self.colorMode])
         ret.append(GimpIOBase.__repr__(self,indent))
         m=self.mask
         if m is not None:
@@ -276,12 +300,12 @@ class Precision:
     to parse it.
     """
 
-    def __init__(self):
+    def __init__(self)->None:
         self.bits:int=8
         self.gamma:bool=True
-        self.numberFormat:Any=int
+        self.numberFormat:typing.Any=int
 
-    def decode(self,gimpVersion,io):
+    def decode(self,gimpVersion:float,io:typing.IO)->None:
         """
         decode the precision code from the file
         """
@@ -306,21 +330,28 @@ class Precision:
                 self.bits=(8,16,32,16,32,64)[code]
                 self.numberFormat=(int,int,int,float,float,float)[code]
 
-    def encode(self,gimpVersion,io):
+    def encode(self,gimpVersion:float,io:typing.IO)->None:
         """
         encode this to the file
 
         NOTE: will not mess with development versions 5 or 6
         """
         if gimpVersion<4:
-            if self.bits!=8 or not(self.gamma) or self.numberFormat!=int:
-                params=(str(str),gimpVersion)
-                raise Exception('Illegal precision (%s) for gimp version %f'%params)
+            if self.bits!=8:
+                msg=f'Illegal precision({self.bits}) for format v{gimpVersion}' # noqa: E501
+                raise Exception(msg)
+            if not self.gamma:
+                msg=f'Illegal gamma({self.gamma}) for format v{gimpVersion}' # noqa: E501
+                raise Exception(msg)
+            if self.numberFormat!=int:
+                numFmt=self.numberFormat.__name__
+                msg=f'Illegal number format({numFmt}) for format v{gimpVersion}' # noqa: E501
+                raise Exception(msg)
         else:
             if gimpVersion==4:
                 if self.bits==64:
-                    params=(str(str),gimpVersion)
-                    raise Exception('Illegal precision (%s) for gimp version %f'%params)
+                    msg=f'Illegal precision({self.bits}) for format v{gimpVersion}' # noqa: E501
+                    raise Exception(msg)
                 if self.numberFormat==int:
                     code=(8,16,32).index(self.bits)
                 else:
@@ -329,7 +360,8 @@ class Precision:
                 if self.gamma:
                     code+=50
             elif gimpVersion in (5,6):
-                raise NotImplementedError('Cannot save to gimp developer version '+str(gimpVersion))
+                msg=f'Cannot save to gimp developer version {gimpVersion}'
+                raise NotImplementedError(msg)
             else: # version 7 or above
                 if self.numberFormat==int:
                     code=(8,16,32).index(self.bits)
@@ -340,7 +372,7 @@ class Precision:
                     code+=50
             io.u32=code
 
-    def requiredGimpVersion(self):
+    def requiredGimpVersion(self)->float:
         """
         return the lowest gimp version that supports this precision
         """
@@ -350,7 +382,7 @@ class Precision:
             return 7
         return 4
 
-    def __repr__(self):
+    def __repr__(self)->str:
         ret=[]
         ret.append(str(self.bits)+"-bit")
         ret.append('gamma' if self.gamma else 'linear')
@@ -374,26 +406,28 @@ class GimpDocument(GimpIOBase):
         filenamePatterns: *.xcf
     """
 
-    MAGIC_NUMBER=(0,'gimp xcf ')
+    MAGIC_NUMBER:typing.Tuple[int,str]=(0,'gimp xcf ')
 
-    def __init__(self,filename: Union[None,str,BinaryIO]=None):
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None):
+        """ """
         GimpIOBase.__init__(self,self)
-        self.dirty:bool=False # a file-changed indicator.  # TODO: Not fully implemented.
-        self._layers:Union[None,List[GimpLayer]]=None
-        self._layerPtr:Union[None,List[int]]=[]
-        self.channels:List[GimpChannel]=[]
-        self._channelPtr:Union[None,List[int]]=[]
-        self.version:Union[None,float]=None
+        self.dirty:bool=False # a file-changed indicator # TODO: Not fully implemented # noqa: E501
+        self._layers:typing.Optional[typing.List[GimpLayer]]=None
+        self._layerPtr:typing.List[int]=[]
+        self.channels:typing.List[GimpChannel]=[]
+        self._channelPtr:typing.Optional[typing.Iterable[int]]=[]
+        self.version:float=7.0
         self.width:int=0
         self.height:int=0
-        self.baseColorMode:int=0
-        self.precision:Union[None,Precision]=None # Precision object
-        self._data:Union[None,bytearray]=None
-        self.filename:Union[str,None]=None
+        self.baseColorMode:COLOR_MODES=COLOR_MODES(0)
+        self.precision:typing.Optional[Precision]=None # Precision object
+        self._data:typing.Optional[bytes]=None
+        self.filename:typing.Optional[str]=None
         if filename is not None:
             self.load(filename)
 
-    def load(self,filename:Union[str,BinaryIO]):
+    def load(self,filename:typing.Union[str,typing.BinaryIO])->None:
         """
         load a gimp file
 
@@ -409,7 +443,7 @@ class GimpDocument(GimpIOBase):
             f.close()
         self._decode_(data)
 
-    def _decode_(self,data:bytes,index:int=0):
+    def _decode_(self,data:bytes,index:int=0)->int:
         """
         decode a byte buffer
 
@@ -421,7 +455,7 @@ class GimpDocument(GimpIOBase):
             raise Exception('Not a valid GIMP file')
         version=io.cString
         if version=='file':
-            self.version=0
+            self.version=7
         else:
             self.version=int(version[1:])
         self.width=io.u32
@@ -437,9 +471,9 @@ class GimpDocument(GimpIOBase):
             if ptr==0:
                 break
             self._layerPtr.append(ptr)
-            l=GimpLayer(self)
-            l._decode_(io.data,ptr)
-            self._layers.append(l)
+            layer=GimpLayer(self)
+            layer._decode_(io.data,ptr) # pylint: disable=protected-access
+            self._layers.append(layer)
         self._channelPtr=[]
         self.channels=[]
         while True:
@@ -466,13 +500,14 @@ class GimpDocument(GimpIOBase):
             self.precision=Precision()
         self.precision.encode(self.version,io)
         io.addBytes(self._propertiesEncode_())
-        dataAreaIdx=io.index+self._POINTER_SIZE_*(len(self.layers)+len(self.channels))
+        dataAreaIdx=io.index+\
+            self._POINTER_SIZE_*(len(self.layers)+len(self.channels))
         dataAreaIo=IO()
         for layer in self.layers:
-            io.pointer=dataAreaIdx+dataAreaIo.index
+            io.index=dataAreaIdx+dataAreaIo.index
             dataAreaIo.addBytes(layer.toBytes())
         for channel in self.channels:
-            io.pointer=dataAreaIdx+dataAreaIo.index
+            io.index=dataAreaIdx+dataAreaIo.index
             dataAreaIo.addBytes(channel.toBytes())
         return io.data
 
@@ -481,35 +516,38 @@ class GimpDocument(GimpIOBase):
         make sure everything is fully loaded from the file
         """
         for layer in self.layers:
-            layer._forceFullyLoaded()
+            layer._forceFullyLoaded() # pylint: disable=protected-access
         for chan in self.channels:
-            chan._forceFullyLoaded()
+            chan._forceFullyLoaded() # pylint: disable=protected-access
         # no longer try to get the data from file
-        self._layerPtr=None
+        self._layerPtr=[]
         self._channelPtr=None
         self._data=None
 
     @property
-    def layers(self)->List[GimpLayer]:
+    def layers(self)->typing.List[GimpLayer]:
         """
         Decode the image's layers if necessary
 
         TODO: need to do the same thing with self.Channels
         """
-        if self._layers is None:
+        if self._layers is None and self._data is not None:
             self._layers=[]
             for ptr in self._layerPtr:
-                l=GimpLayer(self)
-                l.fromBytes(self._data,ptr)
-                self._layers.append(l)
-            # add a reference back to this object so it doesn't go away while array is in use
+                gimpLayer=GimpLayer(self)
+                gimpLayer.fromBytes(self._data,ptr)
+                self._layers.append(gimpLayer)
+            # add a reference back to this object so it doesn't go away
+            # while array is in use
             self._layers[-1].parent=self
             # override some internal methods so we can do more with them
-            self._layers._actualDelitem_=self._layers.__delitem__
-            self._layers.__delitem__=self.deleteLayer
-            self._layers._actualSetitem_=self._layers.__delitem__
-            self._layers.__setitem__=self.setLayer
-        return self._layers
+            self._layers._actualDelitem_=self._layers.__delitem__ # pylint: disable=protected-access # noqa: E501
+            self._layers.__delitem__=self.deleteLayer # pylint: disable=protected-access # noqa: E501
+            self._layers._actualSetitem_=self._layers.__delitem__ # pylint: disable=protected-access # noqa: E501
+            self._layers.__setitem__=self.setLayer # pylint: disable=protected-access # noqa: E501
+        if self._layers is None:
+            return []
+        return list(self._layers)
 
     def getLayer(self,index:int)->GimpLayer:
         """
@@ -522,10 +560,10 @@ class GimpDocument(GimpIOBase):
         """
         self._forceFullyLoaded()
         self.dirty=True
-        self._layerPtr=None # no longer try to use the pointers to get data
-        self.layers[index]._actualSetitem(index,layer)
+        self._layerPtr=[] # no longer try to use the pointers to get data
+        self.layers[index]._actualSetitem(index,layer) # pylint: disable=protected-access # noqa: E501
 
-    def newLayer(self,name:str,image:'PIL.Image',index:int=-1)->GimpLayer:
+    def newLayer(self,name:str,image:PIL.Image.Image,index:int=-1)->GimpLayer:
         """
         create a new layer based on a PIL image
 
@@ -552,22 +590,22 @@ class GimpDocument(GimpIOBase):
         image=PIL.ImageGrab.grabclipboard()
         return self.newLayer(name,image,index)
 
-    def addLayer(self,layer:GimpLayer):
+    def addLayer(self,layer:GimpLayer)->None:
         """
         append a layer object to the document
 
-        :param layer: the new layer to append
+        :param layer:the new layer to append
         """
         self.insertLayer(layer,-1)
-    def appendLayer(self,layer:GimpLayer):
+    def appendLayer(self,layer:GimpLayer)->None:
         """
         append a layer object to the document
 
-        :param layer: the new layer to append
+        :param layer:the new layer to append
         """
         self.insertLayer(layer,-1)
 
-    def insertLayer(self,layer:GimpLayer,index:int=-1):
+    def insertLayer(self,layer:GimpLayer,index:int=-1)->None:
         """
         insert a layer object at a specific position
 
@@ -576,11 +614,13 @@ class GimpDocument(GimpIOBase):
         """
         self.layers.insert(index,layer)
 
-    def deleteLayer(self,index:int):
+    def deleteLayer(self,index:int)->None:
         """
         delete a layer
         """
-        self.__delitem__(index)
+        if self._layers is None:
+            raise IndexError("No layers to delete")
+        del self._layers[index]
 
     # make this class act like this class is an array of layers
     def __len__(self):
@@ -588,7 +628,7 @@ class GimpDocument(GimpIOBase):
     def __getitem__(self,index):
         return self.layers[index]
     def __setitem__(self,index,layer):
-        self.setLayer(layer,index)
+        self.setLayer(index,layer)
     def __delitem__(self,index):
         self.deleteLayer(index)
     def __inc__(self,amt):
@@ -596,7 +636,7 @@ class GimpDocument(GimpIOBase):
         return self
 
     @property
-    def image(self)->'PIL.Image':
+    def image(self)->PIL.Image.Image:
         """
         get a final, compiled image
         """
@@ -604,9 +644,10 @@ class GimpDocument(GimpIOBase):
         # for now, convert to a smartimage and render that
         return self._convertToSmartimage().image
 
-    def _convertToSmartimage(self):
+    def _convertToSmartimage(self)->typing.Any:
         """
-        create a new smartimage document that encoumpasses all features of this xcf
+        create a new smartimage document
+        that includes all features of this xcf
 
         requires the smartimage library
 
@@ -616,10 +657,13 @@ class GimpDocument(GimpIOBase):
             raise ImportError('Unable to convert to smartimage.')
         si=smartimage.SmartImage()
         for layer in self.layers:
-            layer._addToSmartimage(si)
+            layer._addToSmartimage(si) # pylint: disable=protected-access
         return si
 
-    def save(self,toFilename=None,toExtension=None):
+    def save(self,
+        toFilename:typing.Optional[str]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp image to a file
 
@@ -631,22 +675,25 @@ class GimpDocument(GimpIOBase):
         self._forceFullyLoaded()
         if toFilename is None:
             toFilename=self.filename
+        if toFilename is None:
+            toFilename="unknown.xcf"
         if toExtension is None:
             if toFilename is None:
                 toExtension='xcf'
             else:
-                toExtension=toFilename.rsplit('.',1)
-                if len(toExtension)>1:
-                    toExtension=toExtension[-1]
+                toExtensionA=toFilename.rsplit('.',1)
+                if len(toExtensionA)>1:
+                    toExtension=toExtensionA[-1]
                 else:
                     toExtension='xcf'
         else: # change the filename to match extension
-            toFilename=toFilename.rsplit('.',1)[0]+'.'+toExtension
+            toFilename=toFilename.rsplit('.',1)[0]
+            toFilename=f'{toFilename}.{toExtension}'
         if toExtension[0]=='.':
             toExtension=toExtension[1:]
         if toFilename is None:
             toFilename='Untitled.'+toExtension
-        # by this point we always have a filename and an extension without a '.'
+        # by this point its always a filename and an extension without a '.'
         if toExtension=='xcf': # gimp xcf format
             self.filename=toFilename
             if not hasattr(toFilename,'write'):
@@ -666,30 +713,30 @@ class GimpDocument(GimpIOBase):
         else: # assume it's a PIL-compatible format
             self.image.save(toFilename)
 
-    def __repr__(self,indent=''):
+    def __repr__(self,indent:str='')->str:
         """
         Get a textual representation of this object
         """
         ret=[]
         if self.filename is not None:
-            ret.append('Filename: '+self.filename)
-        ret.append('Version: '+str(self.version))
-        ret.append('Size: '+str(self.width)+' x '+str(self.height))
-        ret.append('Base Color Mode: '+self.COLOR_MODES[self.baseColorMode])
-        ret.append('Precision: '+str(self.precision))
+            ret.append(f'Filename: {self.filename}')
+        ret.append(f'Version: {self.version}')
+        ret.append(f'Size: {self.width} x {self.height}')
+        ret.append(f'Base Color Mode: {self.baseColorMode.name}')
+        ret.append(f'Precision: {self.precision}')
         ret.append(GimpIOBase.__repr__(self))
         if self._layerPtr:
             ret.append('Layers: ')
-            for l in self.layers:
-                ret.append(l.__repr__('\t'))
+            for layer in self.layers:
+                ret.append(layer.__repr__('\t'))
         if self._channelPtr:
             ret.append('Channels: ')
             for ch in self.channels:
                 ret.append(ch.__repr__('\t'))
-        return '\n'.join(ret)
+        return ('\n'+indent).join(ret)
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
@@ -702,41 +749,50 @@ def cmdline(args):
         g=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
-                elif arg[0]=='--show':
-                    g.image.show()
-                elif arg[0]=='--showLayer':
-                    if arg[1]=='*':
-                        for n in range(len(g.layers)):
-                            i=g.layers[n].image
+                elif kv[0]=='--show':
+                    if g is None:
+                        print("No image to show")
+                    else:
+                        g.image.show()
+                elif kv[0]=='--showLayer':
+                    if g is None:
+                        print("No image to show the layers of")
+                    elif len(kv)<2 or kv[1] in ('*',''):
+                        for n,layer in enumerate(g.layers):
+                            i=layer.image
                             if i is None:
                                 print('No image for layer',n)
                             else:
                                 print('showing layer',n)
                                 i.show()
                     else:
-                        i=g.layers[int(arg[1])].image
+                        i=g.layers[int(kv[1])].image
                         if i is None:
-                            print('No image for layer',int(arg[1]))
+                            print('No image for layer',int(kv[1]))
                         else:
-                            print('showing layer',arg[1])
+                            print('showing layer',kv[1])
                             i.show()
-                elif arg[0]=='--saveLayer':
-                    layer=arg[1].split(',',1)
-                    if len(layer)>1:
-                        filename=layer[1]
+                elif kv[0]=='--saveLayer':
+                    if g is None:
+                        print("No image")
+                        continue
+                    layerNameA=kv[1].split(',',1)
+                    if len(layerNameA)>1:
+                        filename=layerNameA[1]
                     else:
                         filename='layer *.png'
-                    layer=arg[1][0]
-                    if layer=='*':
+                    layerName=kv[1][0]
+                    if layerName=='*' and g.layers is None:
                         if filename.find('*')<0:
-                            filename='.'.join(filename.split('.',1).insert(1,'*'))
-                        for n in range(len(g.layers)):
-                            i=g.layers[n].image
+                            filename='.'.join(
+                                filename.split('.',1).insert(1,'*'))
+                        for n,layer in enumerate(g.layers):
+                            i=layer.image
                             if i is None:
                                 print('No image for layer',n)
                             else:
@@ -744,18 +800,20 @@ def cmdline(args):
                                 print('saving layer',fn2)
                                 i.save(fn2)
                     else:
-                        i=g.layers[int(layer)].image
+                        i=g.layers[int(layerName)].image
                         if i is None:
-                            print('No image for layer',layer)
+                            print('No image for layer',layerName)
                         else:
-                            i.save(filename.replace('*',layer))
-                elif arg[0]=='--save':
-                    if len(arg)>1:
-                        g.save(arg[1])
+                            i.save(filename.replace('*',layerName))
+                elif kv[0]=='--save':
+                    if g is None:
+                        print("Nothing to save")
+                    elif len(kv)>1:
+                        g.save(kv[1])
                     else:
                         g.save()
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR:unknown argument "{arg}"')
             else:
                 g=GimpDocument(arg)
     if printhelp:
@@ -769,6 +827,8 @@ def cmdline(args):
         print('   --saveLayer=n,out.jpg . save layer(s) out to file')
         print('   --save[=file.xcf] ..... save gimp xcf file')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

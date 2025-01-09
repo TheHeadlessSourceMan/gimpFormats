@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+from imageTools import compareImage
+from gimpFormats import GimpDocument
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,20 +20,24 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpDocument()
-        
+
     def tearDown(self):
         pass
-        
+
     def testImage(self):
+        """
+        Test a single-layer image with transparency
+        """
         self.dut.load(__HERE__+'one_layer_with_transparency.xcf')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         self.dut.save(__HERE__+'actualOutput.png')
-        same=compareImage(self.dut.layers[0].image,__HERE__+'desiredOutput.png')
+        same=compareImage(
+            self.dut.layers[0].image,__HERE__+'desiredOutput.png')
         assert same
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -41,17 +45,17 @@ def testSuite():
     testSuite = unittest.TestSuite()
     testSuite.addTest(Test("testImage"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

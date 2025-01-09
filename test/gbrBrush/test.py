@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+from imageTools import compareImage
+from gimpFormats import GimpGbrBrush
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,14 +20,17 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpGbrBrush()
-        
+
     def tearDown(self):
         pass
-        
+
     def testPepper(self):
+        """
+        Test reading the standard bell pepper brush
+        """
         self.dut.load(__HERE__+'pepper.gbr')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)
         assert asStr
         # test image saving (implicit)
         self.dut.save(__HERE__+'actualOutput_pepper.png')
@@ -41,13 +44,16 @@ class Test(unittest.TestCase):
         actual=open(__HERE__+'actualOutput_pepper.gbr','rb').read()
         assert actual==original
         os.remove(__HERE__+'actualOutput_pepper.gbr')
-        
+
     def testDunes(self):
+        """
+        Test reading the standard dunes brush
+        """
         self.dut.load(__HERE__+'dunes.gbr')
         # test image saving (explicit)
         self.dut.image.save(__HERE__+'actualOutput_dunes.png')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # test for image match
         same=compareImage(self.dut.image,__HERE__+'desiredOutput_dunes.png')
@@ -60,7 +66,7 @@ class Test(unittest.TestCase):
         assert actual==original
         os.remove(__HERE__+'actualOutput_dunes.gbr')
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -69,17 +75,17 @@ def testSuite():
     testSuite.addTest(Test("testDunes"))
     testSuite.addTest(Test("testPepper"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

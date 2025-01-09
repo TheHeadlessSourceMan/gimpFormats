@@ -3,7 +3,7 @@
 """
 Pure python implementation of the gimp gtp tool preset format
 """
-from typing import Optional, List,BinaryIO,Union,Tuple
+import typing
 
 
 class ParenFileValue:
@@ -12,25 +12,26 @@ class ParenFileValue:
     (possibly "scheme" language?)
     """
 
-    def __init__(self) -> None:
-        self.name:Union[str,None]=None
-        self.values:List[Union[str,float,bool]]=[]
+    def __init__(self)->None:
+        self.name:typing.Optional[str]=None
+        self.values:typing.List[typing.Union[str,float,bool]]=[]
 
-    def _addValue(self,bufArray:List[str]) -> None:
+    def _addValue(self,bufArray:typing.List[str])->None:
         if self.name is None: # first value is the name
             self.name=bufArray[0]
         if bufArray:
-            bufArray=''.join(bufArray)
-            if bufArray in ('yes','no'): # boolean
-                self.values.append(bufArray=='yes')
-            elif bufArray[0].isdigit() or bufArray[0] in ('-','.'):
-                if bufArray[0]=='.':
-                    bufArray='0'+bufArray
-                self.values.append(float(bufArray))
-            elif bufArray[0]=='"':
-                self.values.append(bufArray[1:-1])
+            bufStr=''.join(bufArray)
+            if bufStr in ('yes','no'): # boolean
+                self.values.append(bufStr=='yes')
+            elif bufStr[0].isdigit() or bufStr[0] in ('-','.'):
+                if bufStr[0]=='.':
+                    bufStr='0'+bufStr
+                self.values.append(float(bufStr))
+            elif bufStr[0]=='"':
+                self.values.append(bufStr[1:-1])
             else:
-                raise Exception('What kind of value is "%s" while setting "%s"?'%(bufArray,self.name))
+                msg=f'Unknown value "{bufArray}" while setting "{self.name}"'
+                raise Exception(msg)
 
     def __repr__(self,indent:str='')->str:
         """
@@ -46,7 +47,10 @@ class ParenFileValue:
         return ('\n'+indent).join(ret)
 
 
-def parenFileDecode(data:Union[str,bytes],index:int=0)->Tuple[int,List[ParenFileValue]]:
+def parenFileDecode(
+    data:typing.Union[str,bytes],
+    index:int=0
+    )->typing.Tuple[int,typing.Iterable[ParenFileValue]]:
     """
     Decode a parentheses-based file format
     (possibly "scheme" language?)
@@ -83,7 +87,7 @@ def parenFileDecode(data:Union[str,bytes],index:int=0)->Tuple[int,List[ParenFile
             pval.name=''.join(building)
             building=[]
             while index<maxIndex: # for each value
-                pval._addValue(building)
+                pval._addValue(building) # pylint: disable=protected-access
                 building=[]
                 while index<maxIndex: # skip any whitespace
                     c=data[index]
@@ -91,7 +95,7 @@ def parenFileDecode(data:Union[str,bytes],index:int=0)->Tuple[int,List[ParenFile
                         break
                     index+=1
                 if c==')': # finished
-                    pval._addValue(building)
+                    pval._addValue(building) # pylint: disable=protected-access
                     return index+1,pval
                 if c=='(': # child value
                     index,v=pDec(data,index+1)
@@ -106,7 +110,7 @@ def parenFileDecode(data:Union[str,bytes],index:int=0)->Tuple[int,List[ParenFile
                         building.append(c)
                         if c=='"':
                             break
-                    pval._addValue(building)
+                    pval._addValue(building) # pylint: disable=protected-access
                     building=[]
                     index+=1
                 else:
@@ -119,7 +123,7 @@ def parenFileDecode(data:Union[str,bytes],index:int=0)->Tuple[int,List[ParenFile
     return index,values
 
 
-def parenFileEncode(values:List[ParenFileValue])->str:
+def parenFileEncode(values:typing.List[ParenFileValue])->str:
     """
     encode a values tree to a buffer
     """
@@ -148,36 +152,39 @@ class GimpGtpToolPreset:
         filenamePatterns: *.gtp
     """
 
-    def __init__(self,filename:Union[None,str,BinaryIO]=None) -> None:
-        self.values:List[ParenFileValue]=[]
-        self.filename:Union[str,None]=None
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None):
+        """ """
+        self.values:typing.List[ParenFileValue]=[]
+        self.filename:typing.Optional[str]=None
         if filename is not None:
             self.load(filename)
 
-    def load(self,filename:Union[str,BinaryIO])->None:
+    def load(self,filename:typing.Union[str,typing.BinaryIO])->None:
         """
         load a gimp file
 
         :param filename: can be a file name or a file-like object
         """
-        if hasattr(filename,'read'):
-            self.filename=filename.name
-            data=filename.read()
-        else:
+        if isinstance(filename,str):
             self.filename=filename
             f=open(filename,'rb')
             data=f.read()
             f.close()
+        else:
+            self.filename=filename.name
+            data=filename.read()
         self._decode_(data)
 
-    def _decode_(self,data:Union[str,bytes],index:int=0)->int:
+    def _decode_(self,data:typing.Union[str,bytes],index:int=0)->int:
         """
         decode a byte buffer
 
         :param data: data buffer to decode
         :param index: index within the buffer to start at
         """
-        index,self.values=parenFileDecode(data,index)
+        index,values=parenFileDecode(data,index)
+        self.values=list(values)
         return index
 
     def toBytes(self)->bytes:
@@ -186,27 +193,32 @@ class GimpGtpToolPreset:
         """
         return parenFileEncode(self.values).encode('utf-8')
 
-    def save(self,toFilename:Union[str,None,BinaryIO]=None,toExtension:Union[str,None]=None)->None:
+    def save(self,
+        toFilename:typing.Union[str,None,typing.BinaryIO]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp tool preset to a file
         """
-        asImage=False
+        f=None
         if toFilename is None:
             if self.filename is None:
                 self.filename='untitled.gtp'
             toFilename=self.filename
-        elif hasattr(toFilename,'write'):
-            self.filename=toFilename.name
+        elif isinstance(toFilename,str):
+            self.filename=toFilename
         else:
+            f=toFilename
+            toFilename=f.name
             self.filename=toFilename
         if toExtension is None:
             if toFilename is not None:
-                toExtension=toFilename.rsplit('.',1)
-                if len(toExtension)>1:
-                    toExtension=toExtension[-1]
+                ext=toFilename.rsplit('.',1)
+                if len(ext)>1:
+                    toExtension=ext[-1]
                 else:
                     toExtension=None
-        if not hasattr(toFilename,'write'):
+        if f is None:
             f=open(toFilename,'wb')
         f.write(self.toBytes())
 
@@ -220,7 +232,7 @@ class GimpGtpToolPreset:
         return '\n'.join(ret)
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
@@ -233,13 +245,13 @@ def cmdline(args):
         g=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR:unknown argument "{arg}"')
             else:
                 g=GimpGtpToolPreset(arg)
     if printhelp:
@@ -249,6 +261,8 @@ def cmdline(args):
         print('   -h, --help ............ this help screen')
         print('   --dump ................ dump info about this file')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

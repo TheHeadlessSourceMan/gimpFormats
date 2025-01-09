@@ -8,8 +8,7 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+from gimpFormats import GimpVbrBrush
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,29 +19,35 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpVbrBrush()
-        
+
     def tearDown(self):
         pass
-        
+
     def testDiagonalStar(self):
+        """
+        test the diagonal star brush reads properly
+        """
         self.dut.load(__HERE__+'Diagonal-Star-17.vbr')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)
         assert asStr
         # test image saving (explicit)
         #self.dut.image.save(__HERE__+'actualOutput_Diagonal-Star-17.png')
         # test for image match
-        #same=compareImage(self.dut.image,__HERE__+'desiredOutput_Diagonal-Star-17.png')
+        #same=compareImage(self.dut.image,
+        #   __HERE__+'desiredOutput_Diagonal-Star-17.png')
         #assert same
         #os.remove(__HERE__+'actualOutput_Diagonal-Star-17.png')
         # test round-trip compatibility
         self.dut.save(__HERE__+'actualOutput_Diagonal-Star-17.vbr')
-        original=GimpVbrBrush(__HERE__+'Diagonal-Star-17.vbr')#open(__HERE__+'Diagonal-Star-17.vbr','rb').read()
-        actual=self.dut#open(__HERE__+'actualOutput_Diagonal-Star-17.vbr','rb').read()
+        original=GimpVbrBrush(__HERE__+'Diagonal-Star-17.vbr')
+        #open(__HERE__+'Diagonal-Star-17.vbr','rb').read()
+        actual=self.dut#open(
+        #    __HERE__+'actualOutput_Diagonal-Star-17.vbr','rb').read()
         assert actual==original
         os.remove(__HERE__+'actualOutput_Diagonal-Star-17.vbr')
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -50,17 +55,17 @@ def testSuite():
     testSuite = unittest.TestSuite()
     testSuite.addTest(Test("testDiagonalStar"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+#from imageTools import compareImage
+from gimpFormats import GimpGplPalette
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,14 +20,17 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpGplPalette()
-        
+
     def tearDown(self):
         pass
-        
+
     def testPlasma(self):
+        """
+        Test with the plasma palette
+        """
         self.dut.load(__HERE__+'Plasma.gpl')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # test round-trip compatibility
         self.dut.save(__HERE__+'actualOutput_Plasma.gpl')
@@ -36,7 +39,7 @@ class Test(unittest.TestCase):
         assert actual==original
         os.remove(__HERE__+'actualOutput_Plasma.gpl')
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -44,17 +47,17 @@ def testSuite():
     testSuite = unittest.TestSuite()
     testSuite.addTest(Test("testPlasma"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

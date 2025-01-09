@@ -1,5 +1,5 @@
 #!/usr/bin/env
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 """
 Run unit tests
 
@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+from imageTools import compareImage
+from gimpFormats import GimpPatPattern
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,14 +20,17 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpPatPattern()
-        
+
     def tearDown(self):
         pass
-        
+
     def test3dgreen(self):
+        """
+        Test loading the 3dgreen patterh
+        """
         self.dut.load(__HERE__+'3dgreen.pat')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # test image saving (implicit)
         self.dut.save(__HERE__+'actualOutput_3dgreen.png')
@@ -41,11 +44,14 @@ class Test(unittest.TestCase):
         actual=open(__HERE__+'actualOutput_3dgreen.pat','rb').read()
         assert actual==original
         os.remove(__HERE__+'actualOutput_3dgreen.pat')
-        
+
     def testLeopard(self):
+        """
+        Test loading the leopard pattern
+        """
         self.dut.load(__HERE__+'leopard.pat')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # test image saving (explicit)
         self.dut.image.save(__HERE__+'actualOutput_leopard.png')
@@ -60,7 +66,7 @@ class Test(unittest.TestCase):
         assert actual==original
         os.remove(__HERE__+'actualOutput_leopard.pat')
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -69,17 +75,17 @@ def testSuite():
     testSuite.addTest(Test("test3dgreen"))
     testSuite.addTest(Test("testLeopard"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
-    :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+    :param args:command line arguments (WITHOUT the filename)
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

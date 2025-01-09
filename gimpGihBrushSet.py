@@ -6,12 +6,11 @@ Gimp Image Pipe Format
 The gih format is use to store a series of brushes, and some extra info
 for how to use them.
 """
+import typing
 from collections import OrderedDict
+from PIL.Image import Image
 from gimpFormats.binaryIO import IO
 from gimpFormats.gimpGbrBrush import GimpGbrBrush
-from typing import Optional, Union, BinaryIO, List, Dict
-from PIL.Image import Image
-
 
 class GimpGihBrushSet:
     """
@@ -22,7 +21,7 @@ class GimpGihBrushSet:
 
     See:
         https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/gih.txt
-        
+
     Format:
         name: GimpGihBrushSet
         description: Gimp brush set
@@ -32,35 +31,47 @@ class GimpGihBrushSet:
         filenamePatterns: *.gih
     """
 
-    def __init__(self,filename:Union[None,str,BinaryIO]=None) -> None:
-        self.filename:Union[str,None]=None
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None
+        )->None:
+        """ """
+        self.filename:typing.Optional[str]=None
         self.name:str=''
-        self.params:OrderedDict={}
-        self.brushes:List[GimpGbrBrush]=[]
+        self.params:OrderedDict=OrderedDict()
+        self.brushes:typing.List[GimpGbrBrush]=[]
         if filename is not None:
             self.load(filename)
 
     @property
-    def images(self) -> List[Image]:
-        return [brush.image for brush in self.brushes]
+    def images(self)->typing.Iterable[Image]:
+        """
+        The brush images
+        """
+        ret=[]
+        for brush in self.brushes:
+            if brush.image is not None:
+                ret.append(brush.image)
+        return ret
 
-    def load(self,filename:Union[str,BinaryIO])->None:
+    def load(self,
+        filename:typing.Union[str,typing.BinaryIO]
+        )->None:
         """
         load a gimp file
 
         :param filename: can be a file name or a file-like object
         """
-        if hasattr(filename,'read'):
-            self.filename=filename.name
-            data=filename.read()
-        else:
+        if isinstance(filename,str):
             self.filename=filename
             f=open(filename,'rb')
             data=f.read()
             f.close()
+        else:
+            self.filename=filename.name
+            data=filename.read()
         self._decode_(data)
 
-    def _decode_(self,data: bytes,index: int=0) -> int:
+    def _decode_(self,data:bytes,index:int=0)->int:
         """
         decode a byte buffer
 
@@ -72,52 +83,76 @@ class GimpGihBrushSet:
         secondLine=io.textLine.split(' ')
         self.params=OrderedDict()
         numBrushes=int(secondLine[0])
-        # everything that's left in line 2 is a gimp-image-pipe-parameters parasite
+        # everything that's left in line 2
+        # is a gimp-image-pipe-parameters parasite
         for i in range(1,len(secondLine)):
             param=secondLine[i].split(':',1)
             self.params[param[0].strip()]=param[1].strip()
         self.brushes=[]
         for _ in range(numBrushes):
             b=GimpGbrBrush()
-            # NOTE: expects GimpGbrBrush._decode_ to be the number of bytes read
-            #  I don't know whether this is right, wrong, or sideways, but there you have it
-            io.index+=b._decode_(io.data,io.index)
+            # NOTE: expects GimpGbrBrush._decode_ to be the num bytes read
+            #  I don't know whether this is right, wrong, or sideways,
+            #  but there you have it
+            io.index+=b._decode_(io.data,io.index) # pylint: disable=protected-access # noqa: E501
             self.brushes.append(b)
         return io.index
 
-    def toBytes(self) -> bytearray:
+    def toBytes(self)->bytes:
         """
         encode this object to a byte array
         """
         io=IO()
         io.textLine=self.name
         # add the second line of data
-        secondLine=[str(len(self.brushes))]
+        secondLineA=[str(len(self.brushes))]
         for k,v in self.params.items():
-            secondLine.append(k+':'+str(v))
-        secondLine=' '.join(secondLine)
+            secondLineA.append(k+':'+str(v))
+        secondLine=' '.join(secondLineA)
         io.textLine=secondLine
         # add the brushes
         for brush in self.brushes:
-            #TODO: currently broken.  This results in header insterted twice for some reason!
+            #TODO: currently broken.  This results in header insterted twice
+            # for some reason!
             io.addBytes(brush.toBytes())
         return io.data
 
-    def save(self,toFilename:Union[None,str,BinaryIO]=None,toExtension:Optional[str]=None) -> None:
+    def save(self,
+        toFilename:typing.Union[None,str,typing.BinaryIO]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp image to a file
         """
+        f=None
         if toFilename is None:
             if self.filename is None:
                 self.filename='untitled.gih'
             toFilename=self.filename
-        elif hasattr(toFilename,'write'):
-            self.filename=toFilename.name
-        else:
+        elif isinstance(toFilename,str):
             self.filename=toFilename
-        if not hasattr(toFilename,'write'):
-            f=open(toFilename,'wb')
-        f.write(self.toBytes())
+        else:
+            f=toFilename
+            toFilename=toFilename.name
+            self.filename=toFilename
+        if toExtension is None:
+            toExtension=self.filename.rsplit('.',1)[-1]
+        if toExtension=='gih':
+            if f is None:
+                f=open(toFilename,'wb')
+            f.write(self.toBytes())
+        elif toExtension=='gbr':
+            # export the brush set as a series of brush files
+            baseFilename=toFilename.rsplit('.',1)[0]
+            for i,brush in enumerate(self.brushes):
+                modFilename=f'{baseFilename}_{i}.{toExtension}'
+                brush.save(modFilename)
+        else:
+            # export the brush set as a series of image files
+            baseFilename=toFilename.rsplit('.',1)[0]
+            for i,brush in enumerate(self.brushes):
+                modFilename=f'{baseFilename}_{i}.{toExtension}'
+                brush.save(modFilename,toExtension)
 
     def __repr__(self,indent=''):
         """
@@ -129,9 +164,9 @@ class GimpGihBrushSet:
         ret.append('Name: '+str(self.name))
         for k,v in list(self.params.items()):
             ret.append(k+': '+str(v))
-        for i in range(len(self.brushes)):
+        for i,brush in enumerate(self.brushes):
             ret.append('Brush '+str(i))
-            ret.append(self.brushes[i].__repr__(indent+'\t'))
+            ret.append(brush.__repr__(indent+'\t'))
         return ('\n'+indent).join(ret)
 
 
@@ -155,8 +190,8 @@ def cmdline(args):
                     print(g)
                 elif arg[0]=='--show':
                     if arg[1]=='*':
-                        for i in range(len(g.brushes)):
-                            g.brushes[i].image.show()
+                        for brush in g.brushes:
+                            brush.image.show()
                     else:
                         g.brushes[int(arg[1])].image.show()
                 elif arg[0]=='--save':
@@ -164,14 +199,14 @@ def cmdline(args):
                     if filename.find('*')<0:
                         filename='*.'.join(filename.split('.',1))
                     if index=='*':
-                        for i in range(len(g.brushes)):
+                        for i,brush in enumerate(g.brushes):
                             fn2=filename.replace('*',str(i))
-                            g.brushes[i].image.save(fn2)
+                            brush.image.save(fn2)
                     else:
                         fn2=filename.replace('*',i)
                         g.brushes[int(index)].image.save(fn2)
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR: unknown argument "{arg}"')
             else:
                 g=GimpGihBrushSet(arg)
     if printhelp:

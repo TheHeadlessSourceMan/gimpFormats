@@ -3,7 +3,7 @@
 """
 Stuff related to vectors/paths within a gimp document
 """
-from typing import List
+import typing
 from gimpFormats.gimpIOBase import GimpIOBase
 from gimpFormats.binaryIO import IO
 from gimpFormats.gimpParasites import GimpParasite
@@ -14,14 +14,15 @@ class GimpVector(GimpIOBase):
     A gimp brush stroke vector
     """
 
-    def __init__(self,parent):
+    def __init__(self,
+        parent:typing.Optional[GimpIOBase]):
+        """ """
         GimpIOBase.__init__(self,parent)
         self.name:str=''
-        self.uniqueId:int=0
         self.visible:bool=True
         self.linked:bool=False
-        self.parasites:List[GimpParasite]=[]
-        self.strokes:List[GimpStroke]=[]
+        self.parasites:typing.List[GimpParasite]=[]
+        self.strokes:typing.List[GimpStroke]=[]
 
     @property
     def svgPath(self)->str:
@@ -52,7 +53,6 @@ class GimpVector(GimpIOBase):
         self.linked=io.bool
         numParasites=io.u32
         numStrokes=io.u32
-        raise Exception('Parasites=%d Strokes=%d'%(numParasites,numStrokes))
         for _ in range(numParasites):
             p=GimpParasite()
             io.index=p.fromBytes(io.data,io.index)
@@ -107,11 +107,11 @@ class GimpStroke(GimpIOBase):
 
     STROKE_TYPES=['None','Bezier']
 
-    def __init__(self,parent):
+    def __init__(self,parent:GimpIOBase):
         GimpIOBase.__init__(self,parent)
         self.strokeType:int=1 # one of self.STROKE_TYPES
         self.closedShape:bool=True
-        self.points:List[GimpPoint]=[]
+        self.points:typing.List[GimpPoint]=[]
         self.numFloatsPerPoint:int=1
         self.numPoints:int=0
 
@@ -120,7 +120,7 @@ class GimpStroke(GimpIOBase):
         """
         this vector converted to an svg path string
         """
-        svg=[]
+        svg:typing.List[str]=[]
         for point in self.points:
             if not svg:
                 # initial move
@@ -136,10 +136,8 @@ class GimpStroke(GimpIOBase):
                 else:
                     # control point
                     svg.append('%d %d,'%(point.x,point.y))
-                    svg.append(point)
             else:
                 raise Exception('Unknown stroke type')
-            svg.append(stroke.svgPath)
         if self.closedShape:
             svg.append('Z')
         return ' '.join(svg)
@@ -195,7 +193,7 @@ class GimpPoint(GimpIOBase):
 
     POINT_TYPES=['Anchor','Bezier control point']
 
-    def __init__(self,parent):
+    def __init__(self,parent:GimpIOBase):
         GimpIOBase.__init__(self,parent)
         self.x:int=0
         self.y:int=0
@@ -258,8 +256,8 @@ class GimpPoint(GimpIOBase):
         Get a textual representation of this object
         """
         ret=[]
-        ret.append('Location: ('+str(self.x)+','+str(self.y)+')')
-        ret.append('Pressure: '+str(self.pressure))
-        ret.append('Location: ('+str(self.xTilt)+','+str(self.yTilt)+')')
-        ret.append('Wheel: '+str(self.wheel))
+        ret.append(f'Location: ({self.x},{self.y})')
+        ret.append(f'Pressure: {self.pressure}')
+        ret.append(f'Location: ({self.xTilt},{self.yTilt})')
+        ret.append(f'Wheel: {self.wheel}')
         return indent+(('\n'+indent).join(ret))

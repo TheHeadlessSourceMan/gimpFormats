@@ -1,16 +1,15 @@
 #!/usr/bin/env
 # -*- coding: utf-8 -*-
-from typing import Optional, Union, BinaryIO, List, Tuple
-
 """
 Pure python implementation of the gimp gpl palette format
 """
+import typing
 
 
 class GimpGplPalette:
     """
     Pure python implementation of the gimp gpl palette format
-        
+
     Format:
         name: GimpGplPalette
         description: Gimp color palette
@@ -19,35 +18,42 @@ class GimpGplPalette:
         #mimeTypes: application/jpeg
         filenamePatterns: *.gpl
     """
-    
+
     MAGIC_NUMBER=(0,"GIMP Palette")
 
-    def __init__(self,filename: Union[None,str,BinaryIO]=None) -> None:
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None):
+        """ """
         self.name:str=''
         self.columns:int=16
-        self.colors:List[Tuple[int,int,int]]=[]
-        self.colorNames:List[Union[str,None]]=[]
-        self.filename:Union[str,None]=None
+        self.colors:typing.List[typing.Tuple[int,int,int]]=[]
+        self.colorNames:typing.List[typing.Optional[str]]=[]
+        self.filename:typing.Optional[str]=None
         if filename is not None:
             self.load(filename)
 
-    def load(self,filename: Union[str,BinaryIO]) -> None:
+    def load(self,
+        filename:typing.Union[str,typing.BinaryIO]
+        )->None:
         """
         load a gimp file
 
         :param filename: can be a file name or a file-like object
         """
-        if hasattr(filename,'read'):
-            self.filename=filename.name
-            data=filename.read()
-        else:
+        if isinstance(filename,str):
             self.filename=filename
-            f=open(filename,'r')
+            f=open(filename,'rb')
             data=f.read()
             f.close()
+        else:
+            self.filename=filename.name
+            data=filename.read()
         self._decode_(data)
 
-    def _decode_(self,data: Union[str,bytes],index: int=0) -> None:
+    def _decode_(self,
+        data:typing.Union[str,bytes,typing.List[str]],
+        index:int=0
+        )->None:
         """
         decode a byte buffer
 
@@ -56,7 +62,10 @@ class GimpGplPalette:
         """
         if isinstance(data,bytes):
             data=data.decode('utf-8')
-        data=[s.strip() for s in data.split('\n')]
+        if isinstance(data,str):
+            data=[s.strip() for s in data.split('\n')]
+        if index!=0:
+            data=data[index:]
         if data[0]!="GIMP Palette":
             raise Exception('File format error.  Magic value mismatch.')
         self.name=data[1].split(':',1)[-1].lstrip()
@@ -64,56 +73,63 @@ class GimpGplPalette:
         if data[3]!="#":
             raise Exception('File format error.  Separtor missing.')
         for line in data[4:]:
-            line=line.split(None,4)
-            if len(line)<3:
+            lineArry=line.split(None,4)
+            if len(lineArry)<3:
                 continue
-            self.colors.append((int(line[0]),int(line[1]),int(line[2])))
-            if len(line)>3:
-                self.colorNames.append(' '.join(line[3:]))
+            self.colors.append(
+                (int(lineArry[0]),int(lineArry[1]),int(lineArry[2])))
+            if len(lineArry)>3:
+                self.colorNames.append(' '.join(lineArry[3:]))
             else:
                 self.colorNames.append(None)
 
-    def toBytes(self) -> bytes:
+    def toBytes(self)->bytes:
         """
         encode to a raw data stream
         """
         data=[]
         data.append("GIMP Palette")
-        data.append('Name: '+str(self.name))
-        data.append('Columns: '+str(self.columns))
+        data.append(f'Name: {self.name}')
+        data.append(f'Columns: {self.columns}')
         data.append("#")
         for i,color in enumerate(self.colors):
             colorName=self.colorNames[i]
-            line=str(color[0]).rjust(3)+' '+str(color[1]).rjust(3)+' '+str(color[2]).rjust(3)
+            line=' '.join([str(c).rjust(3) for c in color])
             if colorName is not None:
                 line=line+'\t'+colorName
             data.append(line)
         return ('\n'.join(data)+'\n').encode('utf-8')
 
-    def save(self,toFilename: Union[None,str,BinaryIO]=None,toExtension: None=None) -> None:
+    def save(self,
+        toFilename:typing.Union[None,str,typing.BinaryIO]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp image to a file
         """
+        f=None
         if toFilename is None:
             if self.filename is None:
                 self.filename='untitled.gpl'
             toFilename=self.filename
-        elif hasattr(toFilename,'write'):
-            self.filename=toFilename.name
+        elif isinstance(toFilename,str):
+            self.filename=toFilename
         else:
+            f=toFilename
+            toFilename=toFilename.name
             self.filename=toFilename
         if toExtension is None:
             if toFilename is not None:
-                toExtension=toFilename.rsplit('.',1)
-                if len(toExtension)>1:
-                    toExtension=toExtension[-1]
+                ext=toFilename.rsplit('.',1)
+                if len(ext)>1:
+                    toExtension=ext[-1]
                 else:
                     toExtension=None
-        if not hasattr(toFilename,'write'):
+        if f is None:
             f=open(toFilename,'wb')
         f.write(self.toBytes())
 
-    def __repr__(self,indent=''):
+    def __repr__(self,indent:str='')->str:
         """
         Get a textual representation of this object
         """
@@ -125,12 +141,12 @@ class GimpGplPalette:
         ret.append('Colors:')
         for i,color in enumerate(self.colors):
             colorName=self.colorNames[i]
-            line='(%d,%d,%d)'%color[0],color[1],color[2]
+            line='(%d,%d,%d)'%(color[0],color[1],color[2])
             if colorName is not None:
                 line=line+' '+colorName
-        return '\n'.join(ret)
+        return indent+(('\n'+indent).join(ret))
 
-    def __eq__(self,other):
+    def __eq__(self,other:typing.Any)->bool:
         """
         perform a comparison
         """
@@ -148,7 +164,7 @@ class GimpGplPalette:
         return True
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
@@ -161,15 +177,15 @@ def cmdline(args):
         g=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR: unknown argument "{arg}"')
             else:
-                g=GimpVbrBrush(arg)
+                g=GimpGplPalette(arg)
     if printhelp:
         print('Usage:')
         print('  gimpGplPalette.py palette.gpl [options]')
@@ -177,6 +193,8 @@ def cmdline(args):
         print('   -h, --help ............ this help screen')
         print('   --dump ................ dump info about this file')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

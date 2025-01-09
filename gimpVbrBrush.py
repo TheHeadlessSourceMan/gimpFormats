@@ -1,10 +1,16 @@
 #!/usr/bin/env
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
 """
 Pure python implementation of the gimp vbr brush format
 """
-from typing import Optional,Union,BinaryIO
+import typing
+from enum import Enum
+import PIL.Image
 
+
+BRUSH_SHAPES=Enum('BRUSH_SHAPES',start=0,names=(
+    "circle","square","diamond"
+    ))
 
 class GimpVbrBrush:
     """
@@ -14,19 +20,20 @@ class GimpVbrBrush:
         https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/vbr.txt
 
     Format:
-        name: GimpVbrBrush
-        description: Gimp brush
-        guid: {45129576-6728-4967-8888-6b9082862ca6}
-        parentNames: Image
-        #mimeTypes: application/jpeg
-        filenamePatterns: *.vbr
+        name:GimpVbrBrush
+        description:Gimp brush
+        guid:{45129576-6728-4967-8888-6b9082862ca6}
+        parentNames:Image
+        #mimeTypes:application/jpeg
+        filenamePatterns:*.vbr
     """
 
-    MAGIC_NUMBER=(0,'GIMP-VBR')
+    MAGIC_NUMBER:typing.Tuple[int,str]=(0,'GIMP-VBR')
 
-    BRUSH_SHAPES=["circle","square","diamond"]
-
-    def __init__(self,filename: Optional[Union[str,BinaryIO]]=None) -> None:
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None
+        )->None:
+        """ """
         self.version:float=1.0
         self.name:str=''
         self.spacing:float=0
@@ -34,45 +41,52 @@ class GimpVbrBrush:
         self.hardness:float=1
         self.aspectRatio:float=1
         self.angle:float=0
-        self.brushShape:Union[str,None]=None # one of the strings in self.BRUSH_SHAPES
-        self.spikes:Union[float,None]=None
-        self.filename:Union[str,None]=None
+        self.brushShape:typing.Optional[BRUSH_SHAPES]=None
+        self.spikes:typing.Optional[float]=None
+        self.filename:typing.Optional[str]=None
         if filename is not None:
             self.load(filename)
 
-    def load(self,filename: Union[str,BinaryIO]) -> None:
+    def load(self,filename:typing.Union[str,typing.BinaryIO])->None:
         """
         load a gimp file
 
-        :param filename: can be a file name or a file-like object
+        :param filename:can be a file name or a file-like object
         """
-        if hasattr(filename,'read'):
-            self.filename=filename.name
-            data=filename.read()
-        else:
+        data:bytes
+        if isinstance(filename,str):
             self.filename=filename
-            f=open(filename,'r')
+            f=open(filename,'rb')
             data=f.read()
             f.close()
+        else:
+            self.filename=filename.name
+            data=filename.read()
         self._decode_(data)
 
     @property
-    def image(self):
+    def image(self)->PIL.Image.Image:
         """
         this parametric brush converted to a useable PIL image
         """
         raise NotImplementedError() # TODO:
 
-    def _decode_(self,data: Union[str,bytes],index: int=0) -> None:
+    def _decode_(self,
+        data:typing.Union[str,bytes,typing.List[str]],
+        index:int=0
+        )->None:
         """
         decode a byte buffer
 
-        :param data: data buffer to decode
-        :param index: index within the buffer to start at
+        :param data:data buffer to decode
+        :param index:index within the buffer to start at
         """
         if isinstance(data,bytes):
             data=data.decode('utf-8')
-        data=[s.strip() for s in data.split('\n')]
+        if isinstance(data,str):
+            data=[s.strip() for s in data.split('\n')]
+        if index!=0:
+            data=data[index:]
         if data[0]!="GIMP-VBR":
             raise Exception('File format error.  Magic value mismatch.')
         self.version=float(data[1])
@@ -85,7 +99,7 @@ class GimpVbrBrush:
             self.angle=float(data[7])
         elif self.version==1.5:
             self.name=data[2] # max len 255 bytes
-            self.brushShape=data[3] # one of the strings in self.BRUSH_SHAPES
+            self.brushShape=BRUSH_SHAPES(data[3])
             self.spacing=float(data[4])
             self.radius=float(data[5])
             self.spikes=float(data[6])
@@ -95,7 +109,7 @@ class GimpVbrBrush:
         else:
             raise Exception('Unknown version '+str(self.version))
 
-    def toBytes(self) -> bytes:
+    def toBytes(self)->bytes:
         """
         encode to a raw data stream
         """
@@ -120,56 +134,68 @@ class GimpVbrBrush:
             data.append(str(self.angle))
         return ('\n'.join(data)+'\n').encode('utf-8')
 
-    def save(self,toFilename: Union[None,str,BinaryIO]=None,
-        toExtension: Union[str,None]=None) -> None:
+    def save(self,
+        toFilename:typing.Union[None,str,typing.BinaryIO]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp image to a file
         """
         asImage=False
+        f=None
         if toFilename is None:
             if self.filename is None:
                 self.filename='Untitled.vbr'
             toFilename=self.filename
+        elif isinstance(toFilename,str):
+            self.filename=toFilename
         else:
+            f=toFilename
+            toFilename=toFilename.name
             self.filename=toFilename
         if toExtension is None:
             if toFilename is not None:
-                toExtension=toFilename.rsplit('.',1)
-                if len(toExtension)>1:
-                    toExtension=toExtension[-1]
+                ext=toFilename.rsplit('.',1)
+                if len(ext)>1:
+                    toExtension=ext[-1]
                 else:
                     toExtension=None
         if toExtension is not None and toExtension!='vbr':
+            if toExtension=='gpb':
+                # TODO: convert between brush types!
+                raise NotImplementedError()
             asImage=True
         if asImage:
             self.image.save(toFilename)
         else:
-            if not hasattr(toFilename,'write'):
+            if f is None:
                 f=open(toFilename,'wb')
             f.write(self.toBytes())
 
-    def __repr__(self,indent=''):
+    def __repr__(self,indent:str='')->str:
         """
         Get a textual representation of this object
         """
         ret=[]
         if self.filename is not None:
-            ret.append('Filename: '+self.filename)
-        ret.append('Name: '+str(self.name))
-        ret.append('Version: '+str(self.version))
-        ret.append('Spacing: '+str(self.spacing))
-        ret.append('Radius: '+str(self.radius))
-        ret.append('Hardness: '+str(self.hardness))
-        ret.append('Aspect ratio: '+str(self.aspectRatio))
-        ret.append('Angle: '+str(self.angle))
-        ret.append('Brush Shape: '+str(self.brushShape))
-        ret.append('Spikes: '+str(self.spikes))
-        return '\n'.join(ret)
+            ret.append('Filename:'+self.filename)
+        ret.append('Name:'+str(self.name))
+        ret.append('Version:'+str(self.version))
+        ret.append('Spacing:'+str(self.spacing))
+        ret.append('Radius:'+str(self.radius))
+        ret.append('Hardness:'+str(self.hardness))
+        ret.append('Aspect ratio:'+str(self.aspectRatio))
+        ret.append('Angle:'+str(self.angle))
+        ret.append('Brush Shape:'+str(self.brushShape))
+        ret.append('Spikes:'+str(self.spikes))
+        return ('\n'+indent).join(ret)
 
-    def __eq__(self,other: 'GimpVbrBrush') -> bool:
+    def __eq__(self,other:typing.Any)->bool:
         """
         perform a comparison
         """
+        if not isinstance(other,GimpVbrBrush):
+            return False
         if other.name!=self.name:
             return False
         if other.version!=self.version:
@@ -191,11 +217,11 @@ class GimpVbrBrush:
         return True
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
-    :param args: command line arguments (WITHOUT the filename)
+    :param args:command line arguments (WITHOUT the filename)
     """
     printhelp=False
     if not args:
@@ -204,13 +230,13 @@ def cmdline(args):
         g=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR: unknown argument "{arg}"')
             else:
                 g=GimpVbrBrush(arg)
     if printhelp:
@@ -220,6 +246,8 @@ def cmdline(args):
         print('   -h, --help ............ this help screen')
         print('   --dump ................ dump info about this file')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

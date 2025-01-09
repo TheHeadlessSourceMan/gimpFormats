@@ -3,7 +3,7 @@
 """
 Pure python implementation of a gimp pattern file
 """
-from typing import Optional, Tuple, BinaryIO, Union
+import typing
 import PIL.Image
 from gimpFormats.binaryIO import IO
 
@@ -26,38 +26,40 @@ class GimpPatPattern:
 
     MAGIC_NUMBER=(0,'GPAT')
 
-    COLOR_MODES=[None,'L','LA','RGB','RGBA']
+    COLOR_MODES=(None,'L','LA','RGB','RGBA')
 
-    def __init__(self,filename: Union[None,str,BinaryIO]=None) -> None:
-        self.filename:Union[str,None]=None
+    def __init__(self,
+        filename:typing.Union[None,str,typing.BinaryIO]=None):
+        """ """
+        self.filename:typing.Optional[str]=None
         self.version:float=1
         self.width:int=0
         self.height:int=0
         self.bpp:int=4
-        self.mode:Union[None,str]=self.COLOR_MODES[self.bpp]
+        self.mode:typing.Optional[str]=self.COLOR_MODES[self.bpp]
         self.name:str=''
-        self._rawImage:Union[None,bytes]=None
-        self._image:Union[None,'PIL.Image']=None
+        self._rawImage:typing.Optional[bytes]=None
+        self._image:typing.Optional[PIL.Image.Image]=None
         if filename is not None:
             self.load(filename)
 
-    def load(self,filename: Union[str,BinaryIO]) -> None:
+    def load(self,filename:typing.Union[str,typing.BinaryIO])->None:
         """
         load a gimp file
 
         :param filename: can be a file name or a file-like object
         """
-        if hasattr(filename,'read'):
-            self.filename=filename.name
-            data=filename.read()
-        else:
+        if isinstance(filename,str):
             self.filename=filename
             f=open(filename,'rb')
             data=f.read()
             f.close()
+        else:
+            self.filename=filename.name
+            data=filename.read()
         self._decode_(data)
 
-    def _decode_(self,data: bytes,index: int=0) -> None:
+    def _decode_(self,data:bytes,index:int=0)->int:
         """
         decode a byte buffer
 
@@ -78,17 +80,23 @@ class GimpPatPattern:
         self.name=io.getBytes(nameLen).decode('UTF-8')
         self._rawImage=io.getBytes(self.width*self.height*self.bpp)
         self._image=None
+        return io.index-index
 
-    def toBytes(self) -> bytearray:
+    def toBytes(self)->bytes:
         """
         encode to a byte buffer
         """
+        if self.image is None:
+            return bytes()
         io=IO()
         io.u32=24+len(self.name)
         io.u32=self.version
         io.u32=self.width
         io.u32=self.height
-        io.u32=len(self.image.mode)
+        mode=self.image.mode
+        if mode is None:
+            mode='L'
+        io.u32=len(mode)
         io.addBytes('GPAT')
         io.addBytes(self.name.encode('utf-8'))
         if self._rawImage is None:
@@ -99,14 +107,14 @@ class GimpPatPattern:
         return io.data
 
     @property
-    def size(self) -> Tuple[int, int]:
+    def size(self)->typing.Tuple[int,int]:
         """
         the size of the pattern
         """
         return (self.width,self.height)
 
     @property
-    def image(self):
+    def image(self)->typing.Optional[PIL.Image.Image]:
         """
         get a final, compiled image
         """
@@ -114,43 +122,54 @@ class GimpPatPattern:
             if self._rawImage is None:
                 return None
             raw=bytes(self._rawImage)
-            self._image=PIL.Image.frombytes(self.mode,self.size,raw,decoder_name='raw')
+            mode=self.mode
+            if mode is None:
+                mode='L'
+            self._image=PIL.Image.frombytes(
+                mode,self.size,raw,decoder_name='raw')
         return self._image
     @image.setter
-    def image(self,image):
+    def image(self,image:PIL.Image.Image):
         self._image=image
         self._rawImage=None
 
-    def save(self,toFilename: Optional[str]=None,toExtension: None=None) -> None:
+    def save(self,
+        toFilename:typing.Optional[str]=None,
+        toExtension:typing.Optional[str]=None
+        )->None:
         """
         save this gimp image to a file
         """
         asImage=False
+        f=None
         if toFilename is None:
             if self.filename is None:
                 self.filename='untitled.pat'
             toFilename=self.filename
-        elif hasattr(toFilename,'write'):
-            self.filename=toFilename.name
-        else:
+        elif isinstance(toFilename,str):
             self.filename=str(toFilename)
+        else:
+            f=toFilename
+            toFilename=toFilename.name
+            self.filename=toFilename
         if toExtension is None:
             if toFilename is not None:
-                toExtension=toFilename.rsplit('.',1)
-                if len(toExtension)>1:
-                    toExtension=toExtension[-1]
+                ext=toFilename.rsplit('.',1)
+                if len(ext)>1:
+                    toExtension=ext[-1]
                 else:
                     toExtension=None
         if toExtension is not None and toExtension!='pat':
             asImage=True
         if asImage:
-            self.image.save(toFilename)
+            if self.image is not None:
+                self.image.save(toFilename)
         else:
-            if not hasattr(toFilename,'write'):
+            if f is None:
                 f=open(toFilename,'wb')
             f.write(self.toBytes())
 
-    def __repr__(self,indent=''):
+    def __repr__(self,indent:str='')->str:
         """
         Get a textual representation of this object
         """
@@ -165,7 +184,7 @@ class GimpPatPattern:
         return '\n'.join(ret)
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
@@ -178,17 +197,23 @@ def cmdline(args):
         g=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
-                elif arg[0]=='--show':
-                    g.image.show()
-                elif arg[0]=='--save':
-                    g.image.save(arg[1])
+                elif kv[0]=='--show':
+                    if g is None:
+                        print('ERR: No pattern to show')
+                    else:
+                        g.image.show()
+                elif kv[0]=='--save':
+                    if g is None:
+                        print('ERR: No pattern to save')
+                    else:
+                        g.image.save(kv[1])
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR: unknown argument "{arg}"')
             else:
                 g=GimpPatPattern(arg)
     if printhelp:
@@ -200,6 +225,8 @@ def cmdline(args):
         print('   --show ................ show the pattern image')
         print('   --save=out.jpg ........ save out the pattern image')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

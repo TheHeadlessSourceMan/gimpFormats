@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+#from imageTools import compareImage
+from gimpFormats import GimpGgrGradient
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,11 +20,14 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpGgrGradient()
-        
+
     def tearDown(self):
         pass
-        
+
     def colorArray(self,numPoints):
+        """
+        Turn the colors into an array
+        """
         colors=[]
         i=0.0
         inc=1.0/numPoints
@@ -32,20 +35,26 @@ class Test(unittest.TestCase):
             colors.append(self.dut.getColor(i))
             i+=inc
         return colors
-        
+
     def saveColors(self,f,colorArray):
+        """
+        save the colors to a file
+        """
         f.write('r, g, b, a\n'.encode('utf-8'))
         for c in colorArray:
             line=[]
             for chan in c:
-                line.append(str(c))
-            line=', ',join(line)+'\n'
+                line.append(str(chan))
+            line=', '.join(line)+'\n'
             f.write(line.encode('utf-8'))
-        
+
     def testColdSteel(self):
+        """
+        test loading the standard "cold steel" gradient
+        """
         self.dut.load(__HERE__+'Cold_Steel_2.ggr')
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # test round-trip compatibility
         self.dut.save(__HERE__+'actualOutput_Cold_Steel_2.ggr')
@@ -58,7 +67,7 @@ class Test(unittest.TestCase):
         #actual=open(__HERE__+'actualOutput_Cold_Steel_2.csv','wb')
         #saveColors(actual,colors)
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -66,17 +75,17 @@ def testSuite():
     testSuite = unittest.TestSuite()
     testSuite.addTest(Test("testColdSteel"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 

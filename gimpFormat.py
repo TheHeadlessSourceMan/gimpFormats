@@ -3,38 +3,36 @@
 """
 Pure python implementation of the gimp file formats
 """
-from gimpFormats.gimpXcfDocument import *
-from gimpFormats.gimpGbrBrush import *
-from gimpFormats.gimpGgrGradient import *
-from gimpFormats.gimpGihBrushSet import *
-from gimpFormats.gimpGpbBrush import *
-from gimpFormats.gimpGtpToolPreset import *
-from gimpFormats.gimpPatPattern import *
-from gimpFormats.gimpVbrBrush import *
+import typing
+from gimpFormats.gimpXcfDocument import GimpDocument
 
 
 register=False
 
 
 class GimpFormatPlugin:
-    pass
-    
+    """
+    A plugin to the gimp format
+    """
+    # TODO: implement this?
+
 
 # ========= automatically add format info for pyformatgenie =========
 if register:
     try:
         # will run this every time this module is loaded
-        import pyformatgenie
+        import pyformatgenie # type:ignore
         pfg=pyformatgenie.PyFormatGenie()
         pfg.add(GimpFormatPlugin)
         # and the most important part...
         pfg.save()
-    except ImportError as e:
-        # pyformatgenie is not installed (yet?). Continue with whatever you came here for.
+    except ImportError:
+        # pyformatgenie is not installed (yet?). Continue with
+        # whatever you came here for.
         pass
 
 
-def cmdline(args):
+def cmdline(args:typing.Iterable[str])->int:
     """
     Run the command line
 
@@ -44,42 +42,50 @@ def cmdline(args):
     if not args:
         printhelp=True
     else:
-        g=None
+        g:typing.Optional[GimpDocument]=None
         for arg in args:
             if arg.startswith('-'):
-                arg=[a.strip() for a in arg.split('=',1)]
-                if arg[0] in ['-h','--help']:
+                kv=[a.strip() for a in arg.split('=',1)]
+                if kv[0] in ('-h','--help'):
                     printhelp=True
-                elif arg[0]=='--dump':
+                elif kv[0]=='--dump':
                     print(g)
-                elif arg[0]=='--showLayer':
-                    if arg[1]=='*':
-                        for n in range(len(g.layers)):
-                            i=g.layers[n].image
+                elif kv[0]=='--showLayer':
+                    if g is None:
+                        print('ERR: No image')
+                        continue
+                    if kv[1]=='*':
+                        for n,layer in enumerate(g.layers):
+                            i=layer.image
                             if i is None:
                                 print('No image for layer',n)
                             else:
                                 print('showing layer',n)
                                 i.show()
                     else:
-                        i=g.layers[int(arg[1])].image
+                        i=g.layers[int(kv[1])].image
                         if i is None:
-                            print('No image for layer',int(arg[1]))
+                            print('No image for layer',int(kv[1]))
                         else:
-                            print('showing layer',arg[1])
+                            print('showing layer',kv[1])
                             i.show()
-                elif arg[0]=='--saveLayer':
-                    layer=arg[1].split(',',1)
-                    if len(layer)>1:
-                        filename=layer[1]
+                elif kv[0]=='--saveLayer':
+                    if g is None:
+                        print('ERR: No image')
+                        continue
+                    layerName=kv[1].split(',',1)
+                    if len(layerName)>1:
+                        filename=layerName[1]
                     else:
                         filename='layer *.png'
-                    layer=arg[1][0]
-                    if layer=='*':
+                    layerId=kv[1][0]
+                    if layerId=='*':
                         if filename.find('*')<0:
-                            filename='.'.join(filename.split('.',1).insert(1,'*'))
-                        for n in range(len(g.layers)):
-                            i=g.layers[n].image
+                            fnParts=filename.split('.',1)
+                            fnParts.insert(1,'*')
+                            filename='.'.join(fnParts)
+                        for n,layer in enumerate(g.layers):
+                            i=layer.image
                             if i is None:
                                 print('No image for layer',n)
                             else:
@@ -87,13 +93,13 @@ def cmdline(args):
                                 print('saving layer',fn2)
                                 i.save(fn2)
                     else:
-                        i=g.layers[int(layer)].image
+                        i=g.layers[int(layerId)].image
                         if i is None:
-                            print('No image for layer',layer)
+                            print('No image for layer',layerId)
                         else:
-                            i.save(filename.replace('*',layer))
+                            i.save(filename.replace('*',layerId))
                 else:
-                    print('ERR: unknown argument "'+arg[0]+'"')
+                    print(f'ERR: unknown argument "{arg}"')
             else:
                 g=GimpDocument(arg)
     if printhelp:
@@ -105,6 +111,8 @@ def cmdline(args):
         print('   --showLayer=n ......... show layer(s) (use * for all)')
         print('   --saveLayer=n,out.jpg . save layer(s) out to file')
         print('   --register ............ register this extension')
+        return -1
+    return 0
 
 
 if __name__=='__main__':

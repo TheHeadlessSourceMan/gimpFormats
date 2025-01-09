@@ -1,14 +1,17 @@
 #!/usr/bin/env
 # -*- coding: utf-8 -*-
 """
-Parasites are arbitrary (meta)data strings that can be attached to a document tree item
+Parasites are arbitrary (meta)data strings that can be attached
+to a document tree item
 
-They are used to store things like last-used plugin settings, gamma adjuetments, etc.
+They are used to store things like last-used plugin settings,
+gamma adjuetments, etc.
 
 Format of known parasites:
     https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/parasites.txt
 """
-from gimpFormats.binaryIO import *
+import typing
+from gimpFormats.binaryIO import IO
 
 
 #TODO: how to best use these for our puproses??
@@ -47,18 +50,20 @@ KNOWN_LAYER_PARASITES=[
 
 class GimpParasite:
     """
-    Parasites are arbitrary (meta)data strings that can be attached to a document tree item
+    Parasites are arbitrary (meta)data strings that can be attached to
+    a document tree item
 
-    They are used to store things like last-used plugin settings, gamma adjuetments, etc.
+    They are used to store things like last-used plugin settings,
+    gamma adjuetments, etc.
 
     Format of known parasites:
         https://gitlab.gnome.org/GNOME/gimp/blob/master/devel-docs/parasites.txt
     """
 
-    def __init__(self):
+    def __init__(self)->None:
         self.name:str=''
         self.flags:int=0
-        self.data:Union[None,bytes]=None
+        self.data:typing.Optional[bytes]=None
 
     def fromBytes(self,data,index=0):
         """

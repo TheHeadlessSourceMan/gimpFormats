@@ -7,7 +7,7 @@ of gimp files.
 Generally speaking, the user should not care about anything
 in this file.
 """
-from typing import Union, List
+import typing
 import zlib
 import PIL.Image
 from gimpFormats.binaryIO import IO
@@ -19,15 +19,19 @@ class GimpChannel(GimpIOBase):
     Represents a single channel or mask in a gimp image
     """
 
-    def __init__(self,parent,name:str='',image:Union['PIL.Image',None]=None):
+    def __init__(self,
+        parent:GimpIOBase,
+        name:str='',
+        image:typing.Optional[PIL.Image.Image]=None):
+        """ """
         GimpIOBase.__init__(self,parent)
         self.width:int=0
         self.height:int=0
         self.name:str=name
-        self._data:Union[None,bytearray]=None
-        self._imageHierarchy:Union[GimpImageHierarchy,None]=None
-        self._imageHierarchyPtr:Union[int,None]=None
-        if image is not None: # this is last because image can reset values
+        self._data:typing.Union[None,bytes]=None
+        self._imageHierarchy:typing.Union[GimpImageHierarchy,None]=None
+        self._imageHierarchyPtr:typing.Optional[int]=None
+        if image is not None:# this is last because image can reset values
             self.image=image
 
     def fromBytes(self,data:bytes,index:int=0)->int:
@@ -63,7 +67,8 @@ class GimpChannel(GimpIOBase):
         return io.data
 
     @property
-    def image(self)->Union[None,'PIL.Image']:
+    def image(self
+        )->typing.Optional[PIL.Image.Image]:
         """
         get a final, compiled image
         """
@@ -71,7 +76,7 @@ class GimpChannel(GimpIOBase):
             return None
         return self.imageHierarchy.image
     @image.setter
-    def image(self,image:'PIL.Image'):
+    def image(self,image:PIL.Image.Image):
         """
         get a final, compiled image
         """
@@ -86,19 +91,25 @@ class GimpChannel(GimpIOBase):
         """
         make sure everything is fully loaded from the file
         """
-        _=self.image # make sure the image is loaded so we can delete the hierarchy nonsense
+        # first, make sure the image is loaded so we can
+        # get rid of the hierarchy nonsense
+        _=self.image
         self._imageHierarchyPtr=None
         self._data=None
 
     @property
-    def imageHierarchy(self)->Union['GimpImageHierarchy',None]:
+    def imageHierarchy(self
+        )->typing.Optional['GimpImageHierarchy']:
         """
         Get the image hierarchy
 
         This is mainly used for decoding the image, so
         not much use to you.
         """
-        if self._imageHierarchy is None and self._imageHierarchyPtr is not None and self._data is not None:
+        if self._imageHierarchy is None \
+            and self._imageHierarchyPtr is not None \
+            and self._data is not None:
+            #
             self._imageHierarchy=GimpImageHierarchy(self)
             self._imageHierarchy.fromBytes(self._data,self._imageHierarchyPtr)
         return self._imageHierarchy
@@ -128,13 +139,13 @@ class GimpImageHierarchy(GimpIOBase):
         self.width:int=0
         self.height:int=0
         self.bpp:int=0 # Number of bytes per pixel given
-        self._levelPtrs:List[int]=[]
-        self._levels:Union[None,List[GimpImageLevel]]=None
-        self._data:Union[None,bytearray]=None
-        if image is not None: # NOTE: can override earlier parameters
+        self._levelPtrs:typing.List[int]=[]
+        self._levels:typing.List[GimpImageLevel]=[]
+        self._data:typing.Union[None,bytearray]=None
+        if image is not None:# NOTE:can override earlier parameters
             self.image=image
 
-    def fromBytes(self,data:Union[bytes,bytearray],index:int=0)->int:
+    def fromBytes(self,data:typing.Union[bytes,bytearray],index:int=0)->int:
         """
         decode a byte buffer
 
@@ -151,9 +162,9 @@ class GimpImageHierarchy(GimpIOBase):
         self.height=io.u32
         self.bpp=io.u32
         if self.bpp<1 or self.bpp>4:
-            msg="""'Unespected bytes-per-pixel for image data ("""+str(self.bpp)+""").
-                Probably means file corruption."""
-            raise Exception(msg)
+            msg=['Unespected bytes-per-pixel for image data ({self.bpp}))'
+                '(Probably means file corruption.)']
+            raise Exception('\n'.join(msg))
         while True:
             ptr=self._pointerDecode_(io)
             if ptr==0:
@@ -164,7 +175,7 @@ class GimpImageHierarchy(GimpIOBase):
         self._data=bytearray(data)
         return io.index
 
-    def toBytes(self)->bytearray:
+    def toBytes(self)->bytes:
         """
         encode this object to a byte buffer
         """
@@ -184,7 +195,8 @@ class GimpImageHierarchy(GimpIOBase):
         return io.data
 
     @property
-    def levels(self)->Union[None,List['GimpImageLevel']]:
+    def levels(self
+        )->typing.List['GimpImageLevel']:
         """
         Get the levels within this hierarchy
 
@@ -193,13 +205,14 @@ class GimpImageHierarchy(GimpIOBase):
         """
         if self._levels is None and self._data is not None:
             for ptr in self._levelPtrs:
-                l=GimpImageLevel(self)
-                l.fromBytes(self._data,ptr)
-                self._levels=[l]
+                imageLevel=GimpImageLevel(self)
+                imageLevel.fromBytes(self._data,ptr)
+                self._levels=[imageLevel]
         return self._levels
 
     @property
-    def image(self)->Union[None,'PIL.Image']:
+    def image(self
+        )->typing.Optional[PIL.Image.Image]:
         """
         get a final, compiled image
         """
@@ -207,7 +220,7 @@ class GimpImageHierarchy(GimpIOBase):
             return None
         return self.levels[0].image
     @image.setter
-    def image(self,image:'PIL.Image'):
+    def image(self,image:PIL.Image.Image):
         """
         set the image
         """
@@ -236,16 +249,22 @@ class GimpImageLevel(GimpIOBase):
     This represents a single level in an imageHierarchy
     """
 
-    def __init__(self,parent,image:Union[None,'PIL.Image']=None):
+    def __init__(self,
+        parent:GimpIOBase,
+        image:typing.Optional[PIL.Image.Image]=None):
+        """ """
         GimpIOBase.__init__(self,parent)
         self.width:int=0
         self.height:int=0
-        self._tiles:Union[None,List['PIL.Image']]=None # tile PIL images
-        self._image:Union[None,'PIL.Image']=None
+        self._tiles:typing.List[PIL.Image.Image]=[] # tile PIL images
+        self._image:typing.Optional[PIL.Image.Image]=None
         if image is not None:
             self.image=image
 
-    def fromBytes(self,data:Union[bytes,bytearray],index:int=0):
+    def fromBytes(self,
+        data:typing.Union[bytes,bytearray],
+        index:int=0
+        )->int:
         """
         decode a byte buffer
 
@@ -256,11 +275,16 @@ class GimpImageLevel(GimpIOBase):
         #print('Decoding image level at',io.index)
         self.width=io.u32
         self.height=io.u32
-        if self.width!=self.parent.width or self.height!=self.parent.height:
-            currentSize='('+str(self.width)+','+str(self.height)+')'
-            expectedSize='('+str(self.parent.width)+','+str(self.parent.height)+')'
-            msg=' Usually this implies file corruption.'
-            raise Exception('Image data size mismatch. '+currentSize+'!='+expectedSize+msg)
+        parent=self.parent
+        if parent is None:
+            parent=self
+        if self.width!=parent.width or self.height!=parent.height:
+            currentSize=f'({self.width},{self.height})'
+            expectedSize=f'({parent.width},{parent.height})'
+            msgA=[
+                f'Image data size mismatch. {currentSize}!={expectedSize}',
+                ' Usually this implies file corruption.']
+            raise Exception('\n'.join(msgA))
         self._tiles=[]
         self._image=None
         for y in range(0,self.height,64):
@@ -276,13 +300,18 @@ class GimpImageLevel(GimpIOBase):
                     # guess how many bytes are needed
                     data=zlib.decompress(io.data[ptr:ptr+totalBytes+24])
                 else:
-                    raise Exception('ERR: unsupported compression mode %s'%self.doc.compression)
-                subImage=PIL.Image.frombytes(self.mode,size,bytes(data),decoder_name='raw')
+                    msg=f'Unsupported compression mode: {self.doc.compression}'
+                    raise Exception(msg)
+                mode=self.mode
+                if mode is None:
+                    mode="L"
+                subImage=PIL.Image.frombytes(
+                    mode,size,bytes(data),decoder_name='raw')
                 self._tiles.append(subImage)
         _=self._pointerDecode_(io) # list ends with nul character
         return io.index
 
-    def toBytes(self)->bytearray:
+    def toBytes(self)->bytes:
         """
         encode this object to a byte buffer
         """
@@ -303,46 +332,58 @@ class GimpImageLevel(GimpIOBase):
                 elif self.doc.compression==2: # zip
                     data=zlib.compress(data)
                 else:
-                    raise Exception('ERR: unsupported compression mode '+str(self.doc.compression))
+                    msg=f'Unsupported compression mode: {self.doc.compression}'
+                    raise Exception(msg)
                 dataIO.addBytes(data)
         io.addBytes(self._pointerEncode_(0))
         io.addBytes(dataIO.data)
         return io.data
 
-    def _decodeRLE(self,data:bytes,pixels:int,bpp:int,index:int=0)->bytearray:
+    def _decodeRLE(self,
+        data:bytes,pixels:int,bpp:int,index:int=0
+        )->bytes:
         """
         decode RLE encoded image data
         """
-        ret:List[List[int]]=[[] for chan in range(bpp)]
+        ret:typing.List[typing.List[int]]=[[] for chan in range(bpp)]
         for chan in range(bpp):
             n=0
             while n<pixels:
-                opcode=data[index]; index+=1
+                opcode=data[index]
+                index+=1
                 if 0<=opcode<=126: # a short run of identical bytes
-                    val=data[index]; index+=1
+                    val=data[index]
+                    index+=1
                     for _ in range(opcode+1):
                         ret[chan].append(val)
                         n+=1
                 elif opcode==127: # A long run of identical bytes
-                    m=data[index]; index+=1
-                    b=data[index]; index+=1
-                    val=data[index]; index+=1
+                    m=data[index]
+                    index+=1
+                    b=data[index]
+                    index+=1
+                    val=data[index]
+                    index+=1
                     amt=m*256+b
                     for _ in range(amt):
                         ret[chan].append(val)
                         n+=1
                 elif opcode==128: # A long run of different bytes
-                    m=data[index]; index+=1
-                    b=data[index]; index+=1
+                    m=data[index]
+                    index+=1
+                    b=data[index]
+                    index+=1
                     amt=m*256+b
                     for _ in range(amt):
-                        val=data[index]; index+=1
+                        val=data[index]
+                        index+=1
                         ret[chan].append(val)
                         n+=1
                 elif 129<=opcode<=255: # a short run of different bytes
                     amt=256-opcode
                     for _ in range(amt):
-                        val=data[index]; index+=1
+                        val=data[index]
+                        index+=1
                         ret[chan].append(val)
                         n+=1
                 else:
@@ -353,40 +394,51 @@ class GimpImageLevel(GimpIOBase):
         for i in range(pixels):
             for chan in range(bpp):
                 flat.append(ret[chan][i])
-        return flat
+        return bytes(flat)
 
-    def _encodeRLE(self,data:Union[bytes,bytearray],bpp:int)->bytearray:
+    def _encodeRLE(self,
+        data:typing.Union[bytes,bytearray],
+        bpp:int
+        )->bytes:
         """
         encode image to RLE  image data
         """
-        def countSame(data:Union[bytes,bytearray],startIdx:int)->int:
+        def countSame(
+            data:typing.Union[bytes,bytearray],
+            startIdx:int
+            )->int:
             """
             count how many times bytes are identical
             """
-            l=len(data)
+            maxLen=len(data)
             idx=startIdx
-            if idx>=l:
+            if idx>=maxLen:
                 return 0
             c=data[idx]
             idx=startIdx+1
-            while idx<l and data[idx]==c:
+            while idx<maxLen and data[idx]==c:
                 idx+=1
             return idx-startIdx
-        def countDifferent(data:Union[bytes,bytearray],startIdx:int=0)->int:
+        def countDifferent(
+            data:typing.Union[bytes,bytearray],
+            startIdx:int=0
+            )->int:
             """
             count how many times bytes are different
             """
-            l=len(data)
+            maxLen=len(data)
             idx=startIdx
-            if idx>=l:
+            if idx>=maxLen:
                 return 0
             c=data[idx]
             idx=startIdx+1
-            while idx<l and data[idx]!=c:
+            while idx<maxLen and data[idx]!=c:
                 idx+=1
                 c=data[idx]
             return idx-startIdx
-        def rleEncodeChan(data:Union[bytes,bytearray])->bytearray:
+        def rleEncodeChan(
+            data:typing.Union[bytes,bytearray]
+            )->bytearray:
             """
             rle encode a single channel of data
             """
@@ -421,7 +473,7 @@ class GimpImageLevel(GimpIOBase):
         if bpp==1:
             return rleEncodeChan(data)
         # split into channels
-        dataByChannel=[]
+        dataByChannel:typing.List[bytearray]=[]
         for chan in range(bpp):
             chanData=bytearray()
             for index in range(chan,bpp,len(data)):
@@ -429,19 +481,25 @@ class GimpImageLevel(GimpIOBase):
             dataByChannel.append(chanData)
         # encode and join each channel
         ret=bytearray()
-        for chan in dataByChannel:
-            ret.extend(rleEncodeChan(chan))
-        return ret
+        for chanBytes in dataByChannel:
+            ret.extend(rleEncodeChan(chanBytes))
+        return bytes(ret)
 
     @property
     def bpp(self)->int:
         """
         get the number of bytes per pixel
         """
+        if self.parent is None:
+            return 1
         return self.parent.bpp
+    @bpp.setter
+    def bpp(self,bpp:int):
+        if self.parent is not None:
+            self.parent.bpp=bpp
 
     @property
-    def mode(self)->Union[None,str]:
+    def mode(self)->typing.Optional[str]:
         """
         Get the color mode in PIL standard form
         """
@@ -449,7 +507,8 @@ class GimpImageLevel(GimpIOBase):
         return MODES[self.bpp]
 
     @property
-    def tiles(self)->Union[None,'PIL.Image']:
+    def tiles(self
+        )->typing.List[PIL.Image.Image]:
         """
         Get individual tiles for this image
         """
@@ -459,7 +518,9 @@ class GimpImageLevel(GimpIOBase):
             return self._imgToTiles(self.image)
         return None
 
-    def _imgToTiles(self,image:'PIL.Image')->'PIL.Image':
+    def _imgToTiles(self,
+        image:PIL.Image.Image
+        )->typing.List[PIL.Image.Image]:
         """
         break an image into a series of tiles, each<=64x64
         """
@@ -471,7 +532,8 @@ class GimpImageLevel(GimpIOBase):
         return ret
 
     @property
-    def image(self)->Union['PIL.Image',None]:
+    def image(self
+        )->typing.Optional[PIL.Image.Image]:
         """
         get a final, compiled image
         """
@@ -479,19 +541,22 @@ class GimpImageLevel(GimpIOBase):
             tiles=self.tiles
             if tiles is None:
                 return None
-            self._image=PIL.Image.new(self.mode,(self.width,self.height),color=None)
+            mode=self.mode
+            if mode is None:
+                mode='L'
+            self._image=PIL.Image.new(mode,(self.width,self.height))
             tileNum=0
             for y in range(0,self.height,64):
                 for x in range(0,self.width,64):
                     subImage=tiles[tileNum]
                     tileNum+=1
                     self._image.paste(subImage,(x,y))
-            self._tiles=None # TODO: do I want to keep the tiles for any reason??
+            self._tiles=[] # TODO:do I want to keep the tiles for any reason??
         return self._image
     @image.setter
-    def image(self,image:'PIL.Image'):
+    def image(self,image:PIL.Image.Image):
         self._image=image
-        self._tiles=None
+        self._tiles=[]
         self.width=image.width
         self.height=image.height
 

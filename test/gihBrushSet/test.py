@@ -8,8 +8,8 @@ See:
 """
 import unittest
 import os
-from gimpFormats import *
-from imageTools import *
+from imageTools import compareImage
+from gimpFormats import GimpGihBrushSet
 
 
 __HERE__=os.path.abspath(__file__).rsplit(os.sep,1)[0]+os.sep
@@ -20,10 +20,10 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.dut=GimpGihBrushSet()
-        
+
     def tearDown(self):
         pass
-        
+
     def testBrushSet(self,filename):
         """
         :param filename: without extension
@@ -32,7 +32,7 @@ class Test(unittest.TestCase):
         dest='%sactual_%s.gih'%(__HERE__,filename)
         self.dut.load(source)
         # test string representation
-        asStr=self.dut.__repr__()
+        asStr=repr(self.dut)()
         assert asStr
         # new check all the internal brushes
         for id,image in enumerate(self.dut.images):
@@ -50,14 +50,20 @@ class Test(unittest.TestCase):
         actual=open(dest,'rb').read()
         assert actual==original
         os.remove(dest)
-        
+
     def testWilber(self):
+        """
+        test the wilbur brush set
+        """
         self.testBrushSet('Wilber')
-        
+
     def testFeltpen(self):
+        """
+        test a felt pen brush set
+        """
         self.testBrushSet('feltpen')
 
-        
+
 def testSuite():
     """
     Combine unit tests into an entire suite
@@ -66,17 +72,17 @@ def testSuite():
     testSuite.addTest(Test("testWilber"))
     testSuite.addTest(Test("testFeltpen"))
     return testSuite
-        
-        
+
+
 def cmdline(args):
     """
     Run the command line
 
     :param args: command line arguments (WITHOUT the filename)
-    """
-    """
+
     Run all the test suites in the standard way.
     """
+    _=args
     unittest.main()
 
 
